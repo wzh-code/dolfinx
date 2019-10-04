@@ -2,6 +2,8 @@ set(HEADERS
   defines.h
   dolfin_common.h
   dolfin_doc.h
+  fenics_geometry.h
+  fenics_interface.h
   IndexMap.h
   init.h
   log.h

@@ -13,8 +13,8 @@ namespace mesh
 
 class Mesh;
 
-/// This class implements the ordering of simples mesh entities
-/// according to the UFC specification.
+/// This class implements the ordering of simple mesh entities
+/// according to the FEniCS specification.
 
 class Ordering
 {

@@ -398,7 +398,7 @@ void FunctionSpace::set_x(
       coordinate_dofs(num_dofs_g, gdim);
   for (auto& cell : mesh::MeshRange(*_mesh, tdim))
   {
-    // Update UFC cell
+    // Update FEniCS cell
     const int cell_index = cell.index();
     for (int i = 0; i < num_dofs_g; ++i)
       for (int j = 0; j < gdim; ++j)

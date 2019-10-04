@@ -6,6 +6,7 @@
 
 #include "Form.h"
 #include "DofMap.h"
+#include <dolfin/common/fenics_interface.h>
 #include <dolfin/common/types.h>
 #include <dolfin/fem/CoordinateMapping.h>
 #include <dolfin/fem/FiniteElement.h>
@@ -18,7 +19,6 @@
 #include <dolfin/mesh/MeshFunction.h>
 #include <memory>
 #include <string>
-#include <ufc.h>
 
 using namespace dolfin;
 using namespace dolfin::fem;

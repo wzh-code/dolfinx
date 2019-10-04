@@ -193,12 +193,6 @@ set_package_properties(PETSc PROPERTIES TYPE REQUIRED
   URL "https://www.mcs.anl.gov/petsc/"
   PURPOSE "PETSc linear algebra backend")
 
-# Check for required package UFC
-find_package(UFC MODULE ${DOLFIN_VERSION_MAJOR}.${DOLFIN_VERSION_MINOR})
-set_package_properties(UFC PROPERTIES TYPE REQUIRED
-  DESCRIPTION "Unified language for form-compilers (part of FFC-X)"
-  URL "https://github.com/fenics/ffcx")
-
 # Check for HDF5
 set(HDF5_PREFER_PARALLEL TRUE)
 find_package(HDF5 REQUIRED)
@@ -287,6 +281,9 @@ install(FILES ${CMAKE_BINARY_DIR}/dolfin.conf
 # Generate form files for tests and demos and DOLFIN if not exists
 # FIXME: Generate files in Build directory instead, at least for demo
 # and tests
+
+# Python is required for demos
+find_package(PythonInterp 3 REQUIRED)
 
 set(COPY_DEMO_TEST_DEMO_DATA FALSE)
 if (PYTHONINTERP_FOUND AND NOT EXISTS ${DOLFIN_SOURCE_DIR}/demo/poisson/Poisson.h)

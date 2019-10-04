@@ -14,8 +14,8 @@
 #include <unsupported/Eigen/CXX11/Tensor>
 #include <vector>
 
-struct ufc_coordinate_mapping;
-struct ufc_finite_element;
+struct fenics_coordinate_mapping;
+struct fenics_finite_element;
 
 namespace dolfin
 {
@@ -27,9 +27,9 @@ namespace fem
 class FiniteElement
 {
 public:
-  /// Create finite element from UFC finite element
-  /// @param[in] ufc_element UFC finite element
-  FiniteElement(const ufc_finite_element& ufc_element);
+  /// Create finite element from FEniCS finite element
+  /// @param[in] fenics_element FEniCS finite element
+  FiniteElement(const fenics_finite_element& fenics_element);
 
   /// Destructor
   virtual ~FiniteElement() = default;
@@ -146,8 +146,8 @@ private:
                     const double*, const double*, const double*, int)>
       _transform_reference_basis_derivatives;
 
-  std::function<int(ufc_scalar_t*, const ufc_scalar_t*, const double*, int,
-                    const ufc_coordinate_mapping*)>
+  std::function<int(fenics_scalar_t*, const fenics_scalar_t*, const double*, int,
+                    const fenics_coordinate_mapping*)>
       _transform_values;
 };
 } // namespace fem

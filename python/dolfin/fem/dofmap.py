@@ -8,31 +8,31 @@
 from dolfin import cpp
 
 
-def make_ufc_finite_element(ufc_finite_element):
-    """Returns ufc finite element from a pointer"""
-    return cpp.fem.make_ufc_finite_element(ufc_finite_element)
+def make_fenics_finite_element(fenics_finite_element):
+    """Returns finite element from a pointer"""
+    return cpp.fem.make_fenics_finite_element(fenics_finite_element)
 
 
-def make_ufc_dofmap(ufc_dofmap):
-    """Returns ufc dofmap from a pointer"""
-    return cpp.fem.make_ufc_dofmap(ufc_dofmap)
+def make_fenics_dofmap(fenics_dofmap):
+    """Returns dofmap from a pointer"""
+    return cpp.fem.make_fenics_dofmap(fenics_dofmap)
 
 
-def make_ufc_form(ufc_form):
-    """Returns ufc form from a pointer"""
-    return cpp.fem.make_ufc_form(ufc_form)
+def make_fenics_form(fenics_form):
+    """Returns form from a pointer"""
+    return cpp.fem.make_fenics_form(fenics_form)
 
 
-def make_coordinate_mapping(ufc_coordinate_mapping):
-    """Returns CoordinateMapping from a pointer to a ufc_coordinate_mapping"""
-    return cpp.fem.make_coordinate_mapping(ufc_coordinate_mapping)
+def make_coordinate_mapping(fenics_coordinate_mapping):
+    """Returns CoordinateMapping from a pointer to a fenics_coordinate_mapping"""
+    return cpp.fem.make_coordinate_mapping(fenics_coordinate_mapping)
 
 
 class DofMap:
     """Degree-of-freedom map
 
     This class handles the mapping of degrees of freedom. It builds
-    a dof map based on a ufc_dofmap on a specific mesh.
+    a dof map based on a fenics_dofmap on a specific mesh.
     """
 
     def __init__(self, dofmap: cpp.fem.DofMap):

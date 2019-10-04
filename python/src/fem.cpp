@@ -6,6 +6,7 @@
 
 #include "caster_petsc.h"
 #include <Eigen/Dense>
+#include <dolfin/common/fenics_interface.h>
 #include <dolfin/common/IndexMap.h>
 #include <dolfin/common/types.h>
 #include <dolfin/fem/CoordinateMapping.h>
@@ -35,7 +36,6 @@
 #include <pybind11/pytypes.h>
 #include <pybind11/stl.h>
 #include <string>
-#include <ufc.h>
 
 namespace py = pybind11;
 
@@ -43,46 +43,46 @@ namespace dolfin_wrappers
 {
 void fem(py::module& m)
 {
-  // UFC objects
-  py::class_<ufc_finite_element, std::shared_ptr<ufc_finite_element>>(
-      m, "ufc_finite_element", "UFC finite element object");
-  py::class_<ufc_dofmap, std::shared_ptr<ufc_dofmap>>(m, "ufc_dofmap",
-                                                      "UFC dofmap object");
-  py::class_<ufc_form, std::shared_ptr<ufc_form>>(m, "ufc_form",
-                                                  "UFC form object");
-  py::class_<ufc_coordinate_mapping, std::shared_ptr<ufc_coordinate_mapping>>(
-      m, "ufc_coordinate_mapping", "UFC coordinate_mapping object");
+  // Interface objects
+  py::class_<fenics_finite_element, std::shared_ptr<fenics_finite_element>>(
+      m, "fenics_finite_element", "FEniCS finite element object");
+  py::class_<fenics_dofmap, std::shared_ptr<fenics_dofmap>>(
+      m, "fenics_dofmap", "FEniCS dofmap object");
+  py::class_<fenics_form, std::shared_ptr<fenics_form>>(
+      m, "fenics_form", "FEniCS form object");
+  py::class_<fenics_coordinate_mapping, std::shared_ptr<fenics_coordinate_mapping>>(
+      m, "fenics_coordinate_mapping", "FEniCS coordinate_mapping object");
 
-  // Functions to convert pointers (from JIT usually) to UFC objects
-  m.def("make_ufc_finite_element",
+  // Functions to convert pointers (from JIT usually) to FEniCS interface objects
+  m.def("make_fenics_finite_element",
         [](std::uintptr_t e) {
-          ufc_finite_element* p = reinterpret_cast<ufc_finite_element*>(e);
-          return std::shared_ptr<const ufc_finite_element>(p);
+          fenics_finite_element* p = reinterpret_cast<fenics_finite_element*>(e);
+          return std::shared_ptr<const fenics_finite_element>(p);
         },
-        "Create a ufc_finite_element object from a pointer.");
+        "Create a fenics_finite_element object from a pointer.");
 
-  m.def("make_ufc_dofmap",
+  m.def("make_fenics_dofmap",
         [](std::uintptr_t e) {
-          ufc_dofmap* p = reinterpret_cast<ufc_dofmap*>(e);
-          return std::shared_ptr<const ufc_dofmap>(p);
+          fenics_dofmap* p = reinterpret_cast<fenics_dofmap*>(e);
+          return std::shared_ptr<const fenics_dofmap>(p);
         },
-        "Create a ufc_dofmap object from a pointer.");
+        "Create a fenics_dofmap object from a pointer.");
 
-  m.def("make_ufc_form",
+  m.def("make_fenics_form",
         [](std::uintptr_t e) {
-          ufc_form* p = reinterpret_cast<ufc_form*>(e);
-          return std::shared_ptr<const ufc_form>(p);
+          fenics_form* p = reinterpret_cast<fenics_form*>(e);
+          return std::shared_ptr<const fenics_form>(p);
         },
-        "Create a ufc_form object from a pointer.");
+        "Create a fenics_form object from a pointer.");
 
   m.def("make_coordinate_mapping",
         [](std::uintptr_t e) {
-          ufc_coordinate_mapping* p
-              = reinterpret_cast<ufc_coordinate_mapping*>(e);
-          return dolfin::fem::get_cmap_from_ufc_cmap(*p);
+          fenics_coordinate_mapping* p
+              = reinterpret_cast<fenics_coordinate_mapping*>(e);
+          return dolfin::fem::get_cmap_from_fenics_cmap(*p);
         },
         "Create a CoordinateMapping object from a pointer to a "
-        "ufc_coordinate_map.");
+        "fenics_coordinate_map.");
 
   // utils
   m.def("create_vector", // TODO: change name to create_vector_block
@@ -131,11 +131,11 @@ void fem(py::module& m)
         py::return_value_policy::take_ownership,
         "Create nested sparse matrix for bilinear forms.");
   m.def("create_element_dof_layout", &dolfin::fem::create_element_dof_layout,
-        "Create ElementDofLayout object from a ufc dofmap.");
+        "Create ElementDofLayout object from a dofmap.");
   m.def("create_dofmap", &dolfin::fem::create_dofmap,
-        "Create DOLFIN DofMap object from a ufc dofmap.");
+        "Create DOLFIN DofMap object from a dofmap.");
   m.def("create_form", &dolfin::fem::create_form,
-        "Create DOLFIN form from a ufc form.");
+        "Create DOLFIN form from a form.");
 
   m.def("build_dofmap",
         [](const dolfin::mesh::Mesh& mesh,
@@ -149,7 +149,7 @@ void fem(py::module& m)
   py::class_<dolfin::fem::FiniteElement,
              std::shared_ptr<dolfin::fem::FiniteElement>>(
       m, "FiniteElement", "Finite element object")
-      .def(py::init<const ufc_finite_element&>())
+      .def(py::init<const fenics_finite_element&>())
       .def("num_sub_elements", &dolfin::fem::FiniteElement::num_sub_elements)
       .def("dof_reference_coordinates",
            &dolfin::fem::FiniteElement::dof_reference_coordinates)

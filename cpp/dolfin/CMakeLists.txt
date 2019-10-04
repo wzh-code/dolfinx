@@ -83,9 +83,6 @@ endif()
 #------------------------------------------------------------------------------
 # Add include directories and libraries of required packages
 
-# UFC
-target_include_directories(dolfin SYSTEM PUBLIC ${UFC_INCLUDE_DIRS})
-
 # DOLFIN uses Eigen data structures for dense linear algebra operations. Eigen
 # performs 'ideal' memory alignment based around the -march flag passed to the
 # compiler.  However, because Python DOLFIN JIT compiles code at runtime, it is
@@ -165,7 +162,7 @@ target_compile_definitions(dolfin PUBLIC DOLFIN_VERSION="${DOLFIN_VERSION}")
 
 # Just add git revision flag to the one affected file
 set_source_files_properties(common/defines.cpp PROPERTIES COMPILE_FLAGS
-  "-DDOLFIN_GIT_COMMIT_HASH=\\\"${GIT_COMMIT_HASH}\\\" -DUFC_SIGNATURE=\\\"${UFC_SIGNATURE}\\\"")
+  "-DDOLFIN_GIT_COMMIT_HASH=\\\"${GIT_COMMIT_HASH}\\\"")
 
 #------------------------------------------------------------------------------
 # Install

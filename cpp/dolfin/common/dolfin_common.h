@@ -12,6 +12,7 @@ namespace dolfin
 
 // DOLFIN common
 
+#include <dolfin/common/fenics_interface.h>
 #include <dolfin/common/MPI.h>
 #include <dolfin/common/Set.h>
 #include <dolfin/common/SubSystemsManager.h>

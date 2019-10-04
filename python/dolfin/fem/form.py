@@ -37,14 +37,14 @@ class Form(ufl.Form):
         mesh = domain.ufl_cargo()
 
         # Compile UFL form with JIT
-        ufc_form = jit.ffc_jit(
+        fenics_form = jit.ffc_jit(
             form,
             form_compiler_parameters=self.form_compiler_parameters,
             mpi_comm=mesh.mpi_comm())
 
-        # Cast compiled library to pointer to ufc_form
+        # Cast compiled library to pointer to fenics_form
         ffi = cffi.FFI()
-        ufc_form = fem.dofmap.make_ufc_form(ffi.cast("uintptr_t", ufc_form))
+        fenics_form = fem.dofmap.make_fenics_form(ffi.cast("uintptr_t", fenics_form))
 
         # For every argument in form extract its function space
         function_spaces = [
@@ -52,7 +52,7 @@ class Form(ufl.Form):
         ]
 
         # Prepare dolfin.Form and hold it as a member
-        self._cpp_object = cpp.fem.create_form(ufc_form, function_spaces)
+        self._cpp_object = cpp.fem.create_form(fenics_form, function_spaces)
 
         # Need to fill the form with coefficients data
         # For every coefficient in form take its CPP object

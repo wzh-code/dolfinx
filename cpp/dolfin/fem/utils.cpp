@@ -7,6 +7,7 @@
 #include "utils.h"
 #include <Eigen/Dense>
 #include <array>
+#include <dolfin/common/fenics_interface.h>
 #include <dolfin/common/IndexMap.h>
 #include <dolfin/common/Timer.h>
 #include <dolfin/common/types.h>
@@ -23,7 +24,6 @@
 #include <dolfin/mesh/MeshEntity.h>
 #include <dolfin/mesh/MeshIterator.h>
 #include <memory>
-#include <ufc.h>
 
 using namespace dolfin;
 
@@ -462,7 +462,7 @@ dolfin::fem::get_global_index(const std::vector<const common::IndexMap*> maps,
 }
 //-----------------------------------------------------------------------------
 fem::ElementDofLayout
-fem::create_element_dof_layout(const ufc_dofmap& dofmap,
+fem::create_element_dof_layout(const fenics_dofmap& dofmap,
                                const mesh::CellType cell_type,
                                const std::vector<int>& parent_map)
 {
@@ -487,33 +487,33 @@ fem::create_element_dof_layout(const ufc_dofmap& dofmap,
     }
   }
 
-  // TODO: UFC dofmaps just use simple offset for each field but this
-  // could be different for custom dofmaps This data should come
-  // directly from the UFC interface in place of the the implicit
-  // assumption
+  // TODO: FEniCS interface dofmaps just use simple offset for each
+  // field but this could be different for custom dofmaps This data
+  // should come directly from the FEniCS interface in place of the the
+  // implicit assumption
 
-  // Create UFC subdofmaps and compute offset
-  std::vector<std::shared_ptr<ufc_dofmap>> ufc_sub_dofmaps;
+  // Create FEniCS interface subdofmaps and compute offset
+  std::vector<std::shared_ptr<fenics_dofmap>> fenics_sub_dofmaps;
   std::vector<int> offsets(1, 0);
   for (int i = 0; i < dofmap.num_sub_dofmaps; ++i)
   {
-    auto ufc_sub_dofmap
-        = std::shared_ptr<ufc_dofmap>(dofmap.create_sub_dofmap(i), std::free);
-    ufc_sub_dofmaps.push_back(ufc_sub_dofmap);
-    const int num_dofs = ufc_sub_dofmap->num_element_support_dofs;
+    auto fenics_sub_dofmap
+        = std::shared_ptr<fenics_dofmap>(dofmap.create_sub_dofmap(i), std::free);
+    fenics_sub_dofmaps.push_back(fenics_sub_dofmap);
+    const int num_dofs = fenics_sub_dofmap->num_element_support_dofs;
     offsets.push_back(offsets.back() + num_dofs);
   }
 
   std::vector<std::shared_ptr<const fem::ElementDofLayout>> sub_dofmaps;
-  for (std::size_t i = 0; i < ufc_sub_dofmaps.size(); ++i)
+  for (std::size_t i = 0; i < fenics_sub_dofmaps.size(); ++i)
   {
-    auto ufc_sub_dofmap = ufc_sub_dofmaps[i];
-    assert(ufc_sub_dofmap);
-    std::vector<int> parent_map_sub(ufc_sub_dofmap->num_element_support_dofs);
+    auto fenics_sub_dofmap = fenics_sub_dofmaps[i];
+    assert(fenics_sub_dofmap);
+    std::vector<int> parent_map_sub(fenics_sub_dofmap->num_element_support_dofs);
     std::iota(parent_map_sub.begin(), parent_map_sub.end(), offsets[i]);
     sub_dofmaps.push_back(
         std::make_shared<fem::ElementDofLayout>(create_element_dof_layout(
-            *ufc_sub_dofmaps[i], cell_type, parent_map_sub)));
+            *fenics_sub_dofmaps[i], cell_type, parent_map_sub)));
   }
 
   // Check for "block structure". This should ultimately be replaced,
@@ -524,36 +524,36 @@ fem::create_element_dof_layout(const ufc_dofmap& dofmap,
                                cell_type);
 }
 //-----------------------------------------------------------------------------
-fem::DofMap fem::create_dofmap(const ufc_dofmap& ufc_dofmap,
+fem::DofMap fem::create_dofmap(const fenics_dofmap& fenics_dofmap,
                                const mesh::Mesh& mesh)
 {
   return DofMapBuilder::build(
       mesh, std::make_shared<ElementDofLayout>(
-                create_element_dof_layout(ufc_dofmap, mesh.cell_type())));
+                create_element_dof_layout(fenics_dofmap, mesh.cell_type())));
 }
 //-----------------------------------------------------------------------------
 std::vector<std::tuple<int, std::string, std::shared_ptr<function::Function>>>
-fem::get_coeffs_from_ufc_form(const ufc_form& ufc_form)
+fem::get_coeffs_from_fenics_form(const fenics_form& fenics_form)
 {
   std::vector<std::tuple<int, std::string, std::shared_ptr<function::Function>>>
       coeffs;
-  const char** names = ufc_form.coefficient_name_map();
-  for (int i = 0; i < ufc_form.num_coefficients; ++i)
+  const char** names = fenics_form.coefficient_name_map();
+  for (int i = 0; i < fenics_form.num_coefficients; ++i)
   {
     coeffs.push_back(
         std::make_tuple<int, std::string, std::shared_ptr<function::Function>>(
-            ufc_form.original_coefficient_position(i), names[i], nullptr));
+            fenics_form.original_coefficient_position(i), names[i], nullptr));
   }
   return coeffs;
 }
 //-----------------------------------------------------------------------------
 std::vector<std::pair<std::string, std::shared_ptr<const function::Constant>>>
-fem::get_constants_from_ufc_form(const ufc_form& ufc_form)
+fem::get_constants_from_fenics_form(const fenics_form& fenics_form)
 {
   std::vector<std::pair<std::string, std::shared_ptr<const function::Constant>>>
       constants;
-  const char** names = ufc_form.constant_name_map();
-  for (int i = 0; i < ufc_form.num_constants; ++i)
+  const char** names = fenics_form.constant_name_map();
+  for (int i = 0; i < fenics_form.num_constants; ++i)
   {
     constants.push_back(
         std::make_pair<std::string, std::shared_ptr<const function::Constant>>(
@@ -563,20 +563,20 @@ fem::get_constants_from_ufc_form(const ufc_form& ufc_form)
 }
 //-----------------------------------------------------------------------------
 fem::Form fem::create_form(
-    const ufc_form& ufc_form,
+    const fenics_form& fenics_form,
     const std::vector<std::shared_ptr<const function::FunctionSpace>>& spaces)
 {
-  assert(ufc_form.rank == (int)spaces.size());
+  assert(fenics_form.rank == (int)spaces.size());
 
   // Check argument function spaces
   for (std::size_t i = 0; i < spaces.size(); ++i)
   {
     assert(spaces[i]->element());
-    std::unique_ptr<ufc_finite_element, decltype(free)*> ufc_element(
-        ufc_form.create_finite_element(i), free);
+    std::unique_ptr<fenics_finite_element, decltype(free)*> fenics_element(
+        fenics_form.create_finite_element(i), free);
 
-    assert(ufc_element);
-    if (std::string(ufc_element->signature)
+    assert(fenics_element);
+    if (std::string(fenics_element->signature)
         != spaces[i]->element()->signature())
     {
       throw std::runtime_error(
@@ -586,11 +586,11 @@ fem::Form fem::create_form(
 
   // Get list of integral IDs, and load tabulate tensor into memory for each
   FormIntegrals integrals;
-  std::vector<int> cell_integral_ids(ufc_form.num_cell_integrals);
-  ufc_form.get_cell_integral_ids(cell_integral_ids.data());
+  std::vector<int> cell_integral_ids(fenics_form.num_cell_integrals);
+  fenics_form.get_cell_integral_ids(cell_integral_ids.data());
   for (int id : cell_integral_ids)
   {
-    ufc_integral* cell_integral = ufc_form.create_cell_integral(id);
+    fenics_integral* cell_integral = fenics_form.create_cell_integral(id);
     assert(cell_integral);
     integrals.register_tabulate_tensor(FormIntegrals::Type::cell, id,
                                        cell_integral->tabulate_tensor);
@@ -598,12 +598,12 @@ fem::Form fem::create_form(
   }
 
   std::vector<int> exterior_facet_integral_ids(
-      ufc_form.num_exterior_facet_integrals);
-  ufc_form.get_exterior_facet_integral_ids(exterior_facet_integral_ids.data());
+      fenics_form.num_exterior_facet_integrals);
+  fenics_form.get_exterior_facet_integral_ids(exterior_facet_integral_ids.data());
   for (int id : exterior_facet_integral_ids)
   {
-    ufc_integral* exterior_facet_integral
-        = ufc_form.create_exterior_facet_integral(id);
+    fenics_integral* exterior_facet_integral
+        = fenics_form.create_exterior_facet_integral(id);
     assert(exterior_facet_integral);
     integrals.register_tabulate_tensor(
         FormIntegrals::Type::exterior_facet, id,
@@ -612,12 +612,12 @@ fem::Form fem::create_form(
   }
 
   std::vector<int> interior_facet_integral_ids(
-      ufc_form.num_interior_facet_integrals);
-  ufc_form.get_interior_facet_integral_ids(interior_facet_integral_ids.data());
+      fenics_form.num_interior_facet_integrals);
+  fenics_form.get_interior_facet_integral_ids(interior_facet_integral_ids.data());
   for (int id : interior_facet_integral_ids)
   {
-    ufc_integral* interior_facet_integral
-        = ufc_form.create_interior_facet_integral(id);
+    fenics_integral* interior_facet_integral
+        = fenics_form.create_interior_facet_integral(id);
     assert(interior_facet_integral);
     integrals.register_tabulate_tensor(
         FormIntegrals::Type::interior_facet, id,
@@ -626,8 +626,8 @@ fem::Form fem::create_form(
   }
 
   // Not currently working
-  std::vector<int> vertex_integral_ids(ufc_form.num_vertex_integrals);
-  ufc_form.get_vertex_integral_ids(vertex_integral_ids.data());
+  std::vector<int> vertex_integral_ids(fenics_form.num_vertex_integrals);
+  fenics_form.get_vertex_integral_ids(vertex_integral_ids.data());
   if (vertex_integral_ids.size() > 0)
   {
     throw std::runtime_error(
@@ -635,51 +635,51 @@ fem::Form fem::create_form(
   }
 
   // Create CoordinateMapping
-  ufc_coordinate_mapping* cmap = ufc_form.create_coordinate_mapping();
+  fenics_coordinate_mapping* cmap = fenics_form.create_coordinate_mapping();
   std::shared_ptr<const fem::CoordinateMapping> coord_mapping
-      = fem::get_cmap_from_ufc_cmap(*cmap);
+      = fem::get_cmap_from_fenics_cmap(*cmap);
   std::free(cmap);
 
   return fem::Form(spaces, integrals,
-                   FormCoefficients(fem::get_coeffs_from_ufc_form(ufc_form)),
-                   fem::get_constants_from_ufc_form(ufc_form), coord_mapping);
+                   FormCoefficients(fem::get_coeffs_from_fenics_form(fenics_form)),
+                   fem::get_constants_from_fenics_form(fenics_form), coord_mapping);
 }
 //-----------------------------------------------------------------------------
 std::shared_ptr<const fem::CoordinateMapping>
-fem::get_cmap_from_ufc_cmap(const ufc_coordinate_mapping& ufc_cmap)
+fem::get_cmap_from_fenics_cmap(const fenics_coordinate_mapping& fenics_cmap)
 {
-  static const std::map<ufc_shape, mesh::CellType> ufc_to_cell
+  static const std::map<fenics_shape, mesh::CellType> fenics_to_cell
       = {{vertex, mesh::CellType::point},
          {interval, mesh::CellType::interval},
          {triangle, mesh::CellType::triangle},
          {tetrahedron, mesh::CellType::tetrahedron},
          {quadrilateral, mesh::CellType::quadrilateral},
          {hexahedron, mesh::CellType::hexahedron}};
-  const auto it = ufc_to_cell.find(ufc_cmap.cell_shape);
-  assert(it != ufc_to_cell.end());
+  const auto it = fenics_to_cell.find(fenics_cmap.cell_shape);
+  assert(it != fenics_to_cell.end());
 
   mesh::CellType cell_type = it->second;
-  assert(ufc_cmap.topological_dimension == mesh::cell_dim(cell_type));
+  assert(fenics_cmap.topological_dimension == mesh::cell_dim(cell_type));
 
   return std::make_shared<fem::CoordinateMapping>(
-      cell_type, ufc_cmap.topological_dimension, ufc_cmap.geometric_dimension,
-      ufc_cmap.signature, ufc_cmap.compute_physical_coordinates,
-      ufc_cmap.compute_reference_geometry);
+      cell_type, fenics_cmap.topological_dimension, fenics_cmap.geometric_dimension,
+      fenics_cmap.signature, fenics_cmap.compute_physical_coordinates,
+      fenics_cmap.compute_reference_geometry);
 }
 //-----------------------------------------------------------------------------
 std::shared_ptr<function::FunctionSpace>
-fem::create_functionspace(ufc_function_space* (*fptr)(void),
+fem::create_functionspace(fenics_function_space* (*fptr)(void),
                           std::shared_ptr<mesh::Mesh> mesh)
 {
-  ufc_function_space* space = fptr();
-  ufc_dofmap* ufc_map = space->create_dofmap();
-  ufc_finite_element* ufc_element = space->create_element();
+  fenics_function_space* space = fptr();
+  fenics_dofmap* fenics_map = space->create_dofmap();
+  fenics_finite_element* fenics_element = space->create_element();
   std::shared_ptr<function::FunctionSpace> V
       = std::make_shared<function::FunctionSpace>(
-          mesh, std::make_shared<fem::FiniteElement>(*ufc_element),
-          std::make_shared<fem::DofMap>(fem::create_dofmap(*ufc_map, *mesh)));
-  std::free(ufc_element);
-  std::free(ufc_map);
+          mesh, std::make_shared<fem::FiniteElement>(*fenics_element),
+          std::make_shared<fem::DofMap>(fem::create_dofmap(*fenics_map, *mesh)));
+  std::free(fenics_element);
+  std::free(fenics_map);
   std::free(space);
   return V;
 }

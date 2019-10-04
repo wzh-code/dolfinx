@@ -15,10 +15,10 @@
 #include <memory>
 #include <vector>
 
-struct ufc_dofmap;
-struct ufc_form;
-struct ufc_coordinate_mapping;
-struct ufc_function_space;
+struct fenics_dofmap;
+struct fenics_form;
+struct fenics_coordinate_mapping;
+struct fenics_function_space;
 
 namespace dolfin
 {
@@ -75,44 +75,44 @@ la::PETScVector create_vector_nest(std::vector<const fem::Form*> L);
 std::size_t get_global_index(const std::vector<const common::IndexMap*> maps,
                              const int field, const int n);
 
-/// Create an ElementDofLayout from a ufc_dofmap
-ElementDofLayout create_element_dof_layout(const ufc_dofmap& dofmap,
+/// Create an ElementDofLayout from a fenics_dofmap
+ElementDofLayout create_element_dof_layout(const fenics_dofmap& dofmap,
                                            const mesh::CellType cell_type,
                                            const std::vector<int>& parent_map
                                            = {});
 
-/// Create dof map on mesh from a ufc_dofmap
+/// Create dof map on mesh from a fenics_dofmap
 ///
-/// @param[in] dofmap The ufc_dofmap.
+/// @param[in] dofmap The fenics_dofmap.
 /// @param[in] mesh The mesh.
-DofMap create_dofmap(const ufc_dofmap& dofmap, const mesh::Mesh& mesh);
+DofMap create_dofmap(const fenics_dofmap& dofmap, const mesh::Mesh& mesh);
 
 /// Create form (shared data)
 ///
-/// @param[in] ufc_form The UFC form.
+/// @param[in] fenics_form The FEniCS form.
 /// @param[in] spaces Vector of function spaces.
 Form create_form(
-    const ufc_form& ufc_form,
+    const fenics_form& fenics_form,
     const std::vector<std::shared_ptr<const function::FunctionSpace>>& spaces);
 
-/// Extract coefficients from UFC form
+/// Extract coefficients from FEniCS form
 std::vector<std::tuple<int, std::string, std::shared_ptr<function::Function>>>
-get_coeffs_from_ufc_form(const ufc_form& ufc_form);
+get_coeffs_from_fenics_form(const fenics_form& fenics_form);
 
-/// Extract coefficients from UFC form
+/// Extract coefficients from FEniCS form
 std::vector<std::pair<std::string, std::shared_ptr<const function::Constant>>>
-get_constants_from_ufc_form(const ufc_form& ufc_form);
+get_constants_from_fenics_form(const fenics_form& fenics_form);
 
-/// Get dolfin::fem::CoordinateMapping from ufc
+/// Get dolfin::fem::CoordinateMapping from FEniCS
 std::shared_ptr<const fem::CoordinateMapping>
-get_cmap_from_ufc_cmap(const ufc_coordinate_mapping& ufc_cmap);
+get_cmap_from_fenics_cmap(const fenics_coordinate_mapping& fenics_cmap);
 
-/// Create FunctionSpace from UFC
-/// @param fptr Function Pointer to a ufc_function_space_create function
+/// Create FunctionSpace from FEniCS function space
+/// @param fptr Function Pointer to a fenics_function_space_create function
 /// @param mesh Mesh
 /// @return The created FunctionSpace
 std::shared_ptr<function::FunctionSpace>
-create_functionspace(ufc_function_space* (*fptr)(void), std::shared_ptr<mesh::Mesh> mesh);
+create_functionspace(fenics_function_space* (*fptr)(void), std::shared_ptr<mesh::Mesh> mesh);
 
 } // namespace fem
 } // namespace dolfin

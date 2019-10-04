@@ -13,7 +13,7 @@ from cffi import FFI
 
 
 def create_coordinate_map(o):
-    """Return a compiled UFC coordinate_mapping object"""
+    """Return a compiled FEniCS coordinate_mapping object"""
 
     try:
         # Create a compiled coordinate map from an object with the
