@@ -37,6 +37,7 @@ extern "C"
   typedef struct fenics_finite_element fenics_finite_element;
   typedef struct fenics_dofmap fenics_dofmap;
 
+  /// Finite element
   typedef struct fenics_finite_element
   {
     /// String identifying the finite element
@@ -117,6 +118,7 @@ extern "C"
     fenics_finite_element* (*create)(void);
   } fenics_finite_element;
 
+  /// Degrees-of-freedom mapping
   typedef struct fenics_dofmap
   {
 
