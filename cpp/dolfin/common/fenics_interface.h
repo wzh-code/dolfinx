@@ -551,13 +551,13 @@ extern "C"
   /// Function Space
   typedef struct fenics_function_space
   {
-    // Pointer to factory function that creates a new fenics_finite_element
+    /// Pointer to factory function that creates a new fenics_finite_element
     fenics_finite_element* (*create_element)(void);
 
-    // Pointer to factory function that creates a new fenics_dofmap
+    /// Pointer to factory function that creates a new fenics_dofmap
     fenics_dofmap* (*create_dofmap)(void);
 
-    // Pointer to factory function that creates a new fenics_coordinate_mapping
+    /// Pointer to factory function that creates a new fenics_coordinate_mapping
     fenics_coordinate_mapping* (*create_coordinate_mapping)(void);
   } fenics_function_space;
 
