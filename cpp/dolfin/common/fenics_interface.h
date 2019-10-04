@@ -548,7 +548,7 @@ extern "C"
 
   } fenics_form;
 
-  // FIXME: Formalise a fenics 'function space'.
+  /// Function Space
   typedef struct fenics_function_space
   {
     // Pointer to factory function that creates a new fenics_finite_element
