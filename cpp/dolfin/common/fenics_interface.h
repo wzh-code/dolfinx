@@ -409,16 +409,26 @@ extern "C"
       const double* restrict facet_normals,
       int cell_orientation);
 
+  /// Integral
   typedef struct fenics_integral
   {
+    /// True if coefficient is used in this integral
     const bool* enabled_coefficients;
+
+    /// Tabulation kernel
     fenics_tabulate_tensor* tabulate_tensor;
+
   } fenics_integral;
 
+  /// Custom (runtime quadrature) integral
   typedef struct fenics_custom_integral
   {
+    /// True is coefficient is used in this integral
     const bool* enabled_coefficients;
+
+    /// Tabulation kernel
     fenics_tabulate_tensor_custom* tabulate_tensor;
+
   } fenics_custom_integral;
 
   /// This class defines the interface for the assembly of the global
