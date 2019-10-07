@@ -112,7 +112,8 @@ get_cmap_from_fenics_cmap(const fenics_coordinate_mapping& fenics_cmap);
 /// @param mesh Mesh
 /// @return The created FunctionSpace
 std::shared_ptr<function::FunctionSpace>
-create_functionspace(fenics_function_space* (*fptr)(void), std::shared_ptr<mesh::Mesh> mesh);
+create_functionspace(fenics_function_space* (*fptr)(void),
+                     std::shared_ptr<mesh::Mesh> mesh);
 
 } // namespace fem
 } // namespace dolfin
