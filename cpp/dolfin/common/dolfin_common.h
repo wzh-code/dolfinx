@@ -22,4 +22,3 @@ namespace dolfin
 #include <dolfin/common/timing.h>
 #include <dolfin/common/types.h>
 #include <dolfin/common/version.h>
-#include <dolfin/common/fenics_interface.h>

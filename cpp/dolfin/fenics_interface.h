@@ -5,9 +5,7 @@
 
 #pragma once
 
-#include <dolfin/common/fenics_geometry.h>
-#include <stdbool.h>
-#include <stdint.h>
+#include <fenics_geometry.h>
 
 #ifdef __cplusplus
 extern "C"

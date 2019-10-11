@@ -6,7 +6,6 @@
 
 #include "caster_petsc.h"
 #include <Eigen/Dense>
-#include <dolfin/common/fenics_interface.h>
 #include <dolfin/common/IndexMap.h>
 #include <dolfin/common/types.h>
 #include <dolfin/fem/CoordinateMapping.h>
@@ -20,6 +19,7 @@
 #include <dolfin/fem/PETScDMCollection.h>
 #include <dolfin/fem/assembler.h>
 #include <dolfin/fem/utils.h>
+#include <dolfin/fenics_interface.h>
 #include <dolfin/function/Constant.h>
 #include <dolfin/function/Function.h>
 #include <dolfin/function/FunctionSpace.h>

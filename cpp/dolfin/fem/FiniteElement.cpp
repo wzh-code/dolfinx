@@ -6,8 +6,9 @@
 
 #include "FiniteElement.h"
 #include <dolfin/common/log.h>
-#include <dolfin/common/fenics_interface.h>
+#include <dolfin/fenics_interface.h>
 #include <dolfin/mesh/utils.h>
+
 #include <functional>
 #include <memory>
 

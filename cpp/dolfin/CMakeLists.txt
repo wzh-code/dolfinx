@@ -2,6 +2,10 @@ set(DOLFIN_H dolfin.h)
 install(FILES ${DOLFIN_H} DESTINATION ${DOLFIN_INCLUDE_DIR}
   COMPONENT Development)
 
+set(FENICS_INTERFACE_H fenics_interface.h fenics_geometry.h)
+install(FILES ${FENICS_INTERFACE_H} DESTINATION ${DOLFIN_INCLUDE_DIR}
+  COMPONENT Development)
+
 # Configure and install dolfin/common/version.h file
 string(REPLACE "+" "" DOLFIN_VERSION_MICRO_STRIPPED ${DOLFIN_VERSION_MICRO})
 configure_file(${DOLFIN_SOURCE_DIR}/dolfin/common/version.h.in
@@ -22,7 +26,7 @@ file(GLOB DOLFIN_CONTENT RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} *)
 set(DOLFIN_DIRS)
 
 # List of excluded files and directories
-set(EXCLUDES ${DOLFIN_H} CMakeLists.txt)
+set(EXCLUDES ${DOLFIN_H} ${FENICS_INTERFACE_H} CMakeLists.txt)
 
 # Iterate over all directories and files and append to DOLFIN_DIRS
 foreach(_DIR_NAME ${DOLFIN_CONTENT})
@@ -57,7 +61,7 @@ endforeach()
 #------------------------------------------------------------------------------
 # Define libraries
 
-add_library(dolfin ${DOLFIN_H} ${DOLFIN_HEADERS} ${DOLFIN_SOURCES})
+add_library(dolfin ${DOLFIN_H} ${FENICS_INTERFACE_H} ${DOLFIN_HEADERS} ${DOLFIN_SOURCES})
 set_target_properties(dolfin PROPERTIES ${DOLFIN_LIBRARY_PROPERTIES})
 
 #------------------------------------------------------------------------------
