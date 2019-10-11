@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include <fenics_geometry.h>
+#include "fenics_geometry.h"
 
 #ifdef __cplusplus
 extern "C"
