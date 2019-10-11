@@ -19,7 +19,6 @@
 #include <dolfin/fem/PETScDMCollection.h>
 #include <dolfin/fem/assembler.h>
 #include <dolfin/fem/utils.h>
-#include <dolfin/fenics_interface.h>
 #include <dolfin/function/Constant.h>
 #include <dolfin/function/Function.h>
 #include <dolfin/function/FunctionSpace.h>
@@ -27,6 +26,7 @@
 #include <dolfin/la/PETScVector.h>
 #include <dolfin/mesh/Mesh.h>
 #include <dolfin/mesh/MeshFunction.h>
+#include <fenics_interface.h>
 #include <memory>
 #include <petsc4py/petsc4py.h>
 #include <pybind11/eigen.h>
