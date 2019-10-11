@@ -20,7 +20,7 @@ namespace dolfin
 
 namespace fem
 {
-class CoordinateMapping;
+class CoordinateElement;
 }
 
 namespace function
@@ -82,7 +82,7 @@ public:
        const std::vector<
            std::pair<std::string, std::shared_ptr<const function::Constant>>>
            constants,
-       std::shared_ptr<const CoordinateMapping> coord_mapping);
+       std::shared_ptr<const CoordinateElement> coord_mapping);
 
   /// Create form (no integrals). Integrals can be attached later
   /// using FormIntegrals::set_cell_tabulate_tensor. Experimental.
@@ -201,7 +201,7 @@ public:
   constants() const;
 
   /// Get coordinate_mapping (experimental)
-  std::shared_ptr<const fem::CoordinateMapping> coordinate_mapping() const;
+  std::shared_ptr<const fem::CoordinateElement> coordinate_mapping() const;
 
 private:
   // Integrals associated with the Form
@@ -221,7 +221,7 @@ private:
   std::shared_ptr<const mesh::Mesh> _mesh;
 
   // Coordinate_mapping
-  std::shared_ptr<const fem::CoordinateMapping> _coord_mapping;
+  std::shared_ptr<const fem::CoordinateElement> _coord_mapping;
 };
 } // namespace fem
 } // namespace dolfin

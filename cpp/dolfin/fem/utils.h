@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "CoordinateMapping.h"
+#include "CoordinateElement.h"
 #include "DofMap.h"
 #include "ElementDofLayout.h"
 #include <dolfin/common/types.h>
