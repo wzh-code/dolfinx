@@ -103,8 +103,8 @@ get_coeffs_from_fenics_form(const fenics_form& fenics_form);
 std::vector<std::pair<std::string, std::shared_ptr<const function::Constant>>>
 get_constants_from_fenics_form(const fenics_form& fenics_form);
 
-/// Get dolfin::fem::CoordinateMapping from FEniCS
-std::shared_ptr<const fem::CoordinateMapping>
+/// Get dolfin::fem::CoordinateElement from FEniCS
+std::shared_ptr<const fem::CoordinateElement>
 get_cmap_from_fenics_cmap(const fenics_coordinate_mapping& fenics_cmap);
 
 /// Create FunctionSpace from FEniCS function space

@@ -81,7 +81,7 @@ void fem(py::module& m)
               = reinterpret_cast<fenics_coordinate_mapping*>(e);
           return dolfin::fem::get_cmap_from_fenics_cmap(*p);
         },
-        "Create a CoordinateMapping object from a pointer to a "
+        "Create a fenics_coordinate_mapping object from a pointer to a "
         "fenics_coordinate_map.");
 
   // utils

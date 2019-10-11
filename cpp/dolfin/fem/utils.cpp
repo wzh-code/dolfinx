@@ -634,9 +634,9 @@ fem::Form fem::create_form(
         "Vertex integrals not supported. Under development.");
   }
 
-  // Create CoordinateMapping
+  // Create CoordinateElement
   fenics_coordinate_mapping* cmap = fenics_form.create_coordinate_mapping();
-  std::shared_ptr<const fem::CoordinateMapping> coord_mapping
+  std::shared_ptr<const fem::CoordinateElement> coord_mapping
       = fem::get_cmap_from_fenics_cmap(*cmap);
   std::free(cmap);
 
@@ -645,7 +645,7 @@ fem::Form fem::create_form(
                    fem::get_constants_from_fenics_form(fenics_form), coord_mapping);
 }
 //-----------------------------------------------------------------------------
-std::shared_ptr<const fem::CoordinateMapping>
+std::shared_ptr<const fem::CoordinateElement>
 fem::get_cmap_from_fenics_cmap(const fenics_coordinate_mapping& fenics_cmap)
 {
   static const std::map<fenics_shape, mesh::CellType> fenics_to_cell
@@ -661,7 +661,7 @@ fem::get_cmap_from_fenics_cmap(const fenics_coordinate_mapping& fenics_cmap)
   mesh::CellType cell_type = it->second;
   assert(fenics_cmap.topological_dimension == mesh::cell_dim(cell_type));
 
-  return std::make_shared<fem::CoordinateMapping>(
+  return std::make_shared<fem::CoordinateElement>(
       cell_type, fenics_cmap.topological_dimension, fenics_cmap.geometric_dimension,
       fenics_cmap.signature, fenics_cmap.compute_physical_coordinates,
       fenics_cmap.compute_reference_geometry);
