@@ -436,7 +436,7 @@ def test_assembly_solve_block():
 
 @pytest.mark.parametrize("mesh", [
     dolfinx.generation.UnitSquareMesh(dolfinx.MPI.comm_world, 12, 11),
-    dolfinx.generation.UnitCubeMesh(dolfinx.MPI.comm_world, 3, 5, 4)
+    # dolfinx.generation.UnitCubeMesh(dolfinx.MPI.comm_world, 3, 5, 4)
 ])
 def test_assembly_solve_taylor_hood(mesh):
     """Assemble Stokes problem with Taylor-Hood elements and solve."""
@@ -451,6 +451,10 @@ def test_assembly_solve_taylor_hood(mesh):
     def boundary1(x):
         """Define boundary x = 1"""
         return x[0] > (1.0 - 10 * numpy.finfo(float).eps)
+
+    def corner(x):
+        """Define bottom corner"""
+        return numpy.logical_and(numpy.isclose(x[0], 0.0), numpy.isclose(x[1], 0.0))
 
     def initial_guess_u(x):
         u_init = numpy.row_stack((numpy.sin(x[0]) * numpy.sin(x[1]),
@@ -468,6 +472,9 @@ def test_assembly_solve_taylor_hood(mesh):
     u_bc_1 = dolfinx.Function(P2)
     u_bc_1.interpolate(lambda x: numpy.row_stack(tuple(numpy.sin(x[j]) for j in range(gdim))))
 
+    u_bc_2 = dolfinx.Function(P1)
+    bdofs2 = dolfinx.fem.locate_dofs_geometrical(P1, corner)
+
     facetdim = mesh.topology.dim - 1
     bndry_facets0 = locate_entities_geometrical(mesh, facetdim, boundary0, boundary_only=True)
     bndry_facets1 = locate_entities_geometrical(mesh, facetdim, boundary1, boundary_only=True)
@@ -476,7 +483,7 @@ def test_assembly_solve_taylor_hood(mesh):
     bdofs1 = dolfinx.fem.locate_dofs_topological(P2, facetdim, bndry_facets1)
 
     bcs = [dolfinx.DirichletBC(u_bc_0, bdofs0),
-           dolfinx.DirichletBC(u_bc_1, bdofs1)]
+           dolfinx.DirichletBC(u_bc_1, bdofs1), dolfinx.DirichletBC(u_bc_2, bdofs2)]
 
     u, p = dolfinx.Function(P2), dolfinx.Function(P1)
     du, dp = ufl.TrialFunction(P2), ufl.TrialFunction(P1)
