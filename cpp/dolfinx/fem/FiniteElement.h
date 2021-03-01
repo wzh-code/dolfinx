@@ -51,6 +51,10 @@ public:
   /// @return Element cell shape
   mesh::CellType cell_shape() const noexcept;
 
+  /// Domain shape
+  /// @return Element domain shape
+  mesh::CellType domain_shape() const noexcept;
+
   /// Dimension of the finite element function space
   /// @return Dimension of the finite element space
   int space_dimension() const noexcept;
@@ -230,6 +234,8 @@ private:
   std::string _signature, _family;
 
   mesh::CellType _cell_shape;
+
+  mesh::CellType _domain_shape;
 
   int _tdim, _space_dim, _value_size, _reference_value_size;
 

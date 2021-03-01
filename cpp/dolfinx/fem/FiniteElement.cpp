@@ -56,6 +56,29 @@ FiniteElement::FiniteElement(const ufc_finite_element& ufc_element)
   }
   assert(mesh::cell_dim(_cell_shape) == _tdim);
 
+  const ufc_shape _shapes = ufc_element.domain_shape;
+  switch (_shapes)
+  {
+  case interval:
+    _domain_shape = mesh::CellType::interval;
+    break;
+  case triangle:
+    _domain_shape = mesh::CellType::triangle;
+    break;
+  case quadrilateral:
+    _domain_shape = mesh::CellType::quadrilateral;
+    break;
+  case tetrahedron:
+    _domain_shape = mesh::CellType::tetrahedron;
+    break;
+  case hexahedron:
+    _domain_shape = mesh::CellType::hexahedron;
+    break;
+  default:
+    throw std::runtime_error(
+        "Unknown UFC domain type when building FiniteElement.");
+  }
+
   static const std::map<ufc_shape, std::string> ufc_to_cell
       = {{vertex, "point"},
          {interval, "interval"},
