@@ -90,12 +90,13 @@ fem::create_element_dof_layout(const ufc_dofmap& dofmap,
   const int tdim = mesh::cell_dim(cell_type);
   const int num_domains = mesh::cell_num_entities(cell_type, dofmap.domain_dim);
   std::cout << "num_domains = " << num_domains << "\n";
+  std::cout << "tdim = " << tdim << "\n";
 
-  std::vector<std::vector<std::set<int>>> entity_dofs(tdim + 1);
+  std::vector<std::vector<std::set<int>>> entity_dofs(dofmap.domain_dim + 1);
   std::vector<int> work_array;
-  for (int dim = 0; dim <= tdim; ++dim)
+  for (int dim = 0; dim <= dofmap.domain_dim; ++dim)
   {
-    const int num_entities = mesh::cell_num_entities(cell_type, dim);
+    const int num_entities = mesh::cell_num_entities(domain_type, dim);
     entity_dofs[dim].resize(num_entities);
     const int domain_num_entities = mesh::cell_num_entities(domain_type, dim);
     std::cout << domain_num_entities << "\n";
@@ -108,9 +109,9 @@ fem::create_element_dof_layout(const ufc_dofmap& dofmap,
     }
   }
   std::cout << "entity_dofs = {\n";
-        for (int dim = 0; dim <= tdim; ++dim)
+        for (int dim = 0; dim <= dofmap.domain_dim; ++dim)
         {
-            const int num_entities = mesh::cell_num_entities(cell_type, dim);
+            const int num_entities = mesh::cell_num_entities(domain_type, dim);
             for (int i = 0; i < num_entities; ++i)
             {
                 std::cout << "    ";
@@ -156,14 +157,14 @@ fem::create_element_dof_layout(const ufc_dofmap& dofmap,
       parent_map_sub[j] = offsets[i] + element_block_size * j;
     sub_dofmaps.push_back(
         std::make_shared<fem::ElementDofLayout>(create_element_dof_layout(
-            *ufc_sub_dofmaps[i], cell_type, parent_map_sub)));
+            *ufc_sub_dofmaps[i], domain_type, parent_map_sub)));
   }
 
   std::cout << "-> " << dofmap.domain_dim << "\n";
   // Check for "block structure". This should ultimately be replaced,
   // but keep for now to mimic existing code
   return fem::ElementDofLayout(element_block_size, entity_dofs, parent_map,
-                               sub_dofmaps, cell_type, domain_type);
+                               sub_dofmaps, domain_type, domain_type);
 }
 //-----------------------------------------------------------------------------
 fem::DofMap fem::create_dofmap(MPI_Comm comm, const ufc_dofmap& ufc_dofmap,

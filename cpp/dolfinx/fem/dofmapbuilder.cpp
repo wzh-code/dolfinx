@@ -79,8 +79,8 @@ build_basic_dofmap(const mesh::Topology& topology,
   // Collect cell -> entity connectivities
   std::vector<std::shared_ptr<const graph::AdjacencyList<std::int32_t>>>
       connectivity;
-  for (int d = 0; d <= D; ++d)
-    connectivity.push_back(topology.connectivity(D, d));
+  for (int d = 0; d <= domain_D; ++d)
+    connectivity.push_back(topology.connectivity(domain_D, d));
 
   std::cout << "  A\n";
   // Build global dof arrays
@@ -105,11 +105,11 @@ build_basic_dofmap(const mesh::Topology& topology,
   // Number of dofs per cell
   const int local_dim = element_dof_layout.num_dofs();
 
-  std::cout << "    " << local_dim << " " << num_domains << "\n";
+  std::cout << "    " << "local_dim = " << local_dim << "\n    num_domains = " << num_domains << "\n";
 
   std::cout << "  D\n";
   // Allocate dofmap memory
-  const int num_cells = topology.connectivity(D, 0)->num_nodes();
+  const int num_cells = topology.connectivity(domain_D, 0)->num_nodes();
   std::cout << topology.connectivity(domain_D, 0)->num_nodes() << " " <<
                topology.connectivity(D, 0)->num_nodes() << "\n";
   std::vector<std::int32_t> dofs(num_cells * local_dim);
@@ -149,7 +149,7 @@ build_basic_dofmap(const mesh::Topology& topology,
   {
     std::cout << "  H(" << c << ")\n";
     // Get local (process) and global cell entity indices
-    for (int d = 0; d < D; ++d)
+    for (int d = 0; d < domain_D; ++d)
     {
       if (needs_entities[d])
       {
@@ -165,10 +165,10 @@ build_basic_dofmap(const mesh::Topology& topology,
     std::cout << "  I(" << c << ")\n";
 
     // Handle cell index separately because cell.entities(D) doesn't work.
-    if (needs_entities[D])
+    if (needs_entities[domain_D])
     {
-      entity_indices_global[D][0] = global_indices[D][c];
-      entity_indices_local[D][0] = c;
+      entity_indices_global[domain_D][0] = global_indices[domain_D][c];
+      entity_indices_local[domain_D][0] = c;
     }
 
     std::cout << "  J(" << c << ")\n";
