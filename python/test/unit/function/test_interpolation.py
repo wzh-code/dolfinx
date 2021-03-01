@@ -119,6 +119,7 @@ def run_scalar_test(V, poly_order):
 
     v = Function(V)
     v.interpolate(f)
+    print(v.vector[:])
     points = [random_point_in_cell(V.mesh) for count in range(5)]
     cells = [0 for count in range(5)]
     values = v.eval(points, cells)

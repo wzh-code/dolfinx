@@ -20,7 +20,7 @@ ElementDofLayout::ElementDofLayout(
     int block_size, const std::vector<std::vector<std::set<int>>>& entity_dofs,
     const std::vector<int>& parent_map,
     const std::vector<std::shared_ptr<const ElementDofLayout>>& sub_dofmaps,
-    const mesh::CellType cell_type)
+    const mesh::CellType cell_type, const mesh::CellType domain_type)
     : _block_size(block_size), _parent_map(parent_map), _num_dofs(0),
       _entity_dofs(entity_dofs), _sub_dofmaps(sub_dofmaps)
 {
@@ -70,6 +70,7 @@ ElementDofLayout::ElementDofLayout(
       _num_dofs += entity_dofs[dim][entity_index].size();
     }
   }
+  _domain_dim = mesh::cell_dim(domain_type);
 }
 //-----------------------------------------------------------------------------
 ElementDofLayout ElementDofLayout::copy() const
@@ -80,6 +81,8 @@ ElementDofLayout ElementDofLayout::copy() const
 }
 //-----------------------------------------------------------------------------
 int ElementDofLayout::num_dofs() const { return _num_dofs; }
+//-----------------------------------------------------------------------------
+int ElementDofLayout::domain_dim() const { return _domain_dim; }
 //-----------------------------------------------------------------------------
 int ElementDofLayout::num_entity_dofs(int dim) const
 {

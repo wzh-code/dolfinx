@@ -41,13 +41,15 @@ public:
   ///   entity_dofs[entity_dim][entity_number] = [dof0, dof1, ...]
   /// @param[in] parent_map TODO
   /// @param[in] sub_dofmaps TODO
+  /// @param[in] domain_type The domain of the function space.
   /// @param[in] cell_type The cell type of the mesh.
   ElementDofLayout(
       int block_size,
       const std::vector<std::vector<std::set<int>>>& entity_dofs,
       const std::vector<int>& parent_map,
       const std::vector<std::shared_ptr<const ElementDofLayout>>& sub_dofmaps,
-      const mesh::CellType cell_type);
+      const mesh::CellType cell_type,
+      const mesh::CellType domain_type);
 
   /// Copy the DOF layout, discarding any parent information
   ElementDofLayout copy() const;
@@ -125,6 +127,8 @@ public:
   ///   another map).
   bool is_view() const;
 
+  int domain_dim() const;
+
 private:
   // Block size
   int _block_size;
@@ -151,6 +155,8 @@ private:
 
   // List of sub dofmaps
   std::vector<std::shared_ptr<const ElementDofLayout>> _sub_dofmaps;
+
+  int _domain_dim;
 };
 
 } // namespace fem
