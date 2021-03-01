@@ -6,21 +6,15 @@
 
 import pytest
 
-from sympy import Curve, line_integrate, symbols, simplify
+from sympy import Curve, line_integrate
 from sympy.abc import x, y, t
 
 import dolfinx
 import numpy as np
-import ufl
-from dolfinx import (DirichletBC, Function, FunctionSpace, RectangleMesh, fem,
-                     plot)
+from dolfinx import Function, FunctionSpace, RectangleMesh
 from dolfinx.cpp.mesh import CellType
-from dolfinx.fem import locate_dofs_topological
-from dolfinx.io import XDMFFile
-from dolfinx.mesh import locate_entities_boundary
 from mpi4py import MPI
-from petsc4py import PETSc
-from ufl import dS, ds, dx, grad, inner
+from ufl import dS, ds, inner
 from dolfinx.fem.assemble import assemble_scalar
 
 
@@ -116,4 +110,3 @@ def test_facet_space_with_manual_interpolation():
     print(integral_h)
 
     assert np.isclose(integral, integral_h)
-
