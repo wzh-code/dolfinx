@@ -14,8 +14,12 @@ import numpy as np
 from dolfinx import Function, FunctionSpace, RectangleMesh
 from dolfinx.cpp.mesh import CellType
 from mpi4py import MPI
-from ufl import dS, ds, inner
+from ufl import dS, ds, inner, TrialFunction, TestFunction
 from dolfinx.fem.assemble import assemble_scalar
+import ffcx
+import cffi
+import numba
+from petsc4py import PETSc
 
 
 @pytest.mark.parametrize("k", [1, 2, 3])
@@ -163,7 +167,7 @@ def test_facet_space_custom_kernel():
     coords = np.array([0.0, 0.0, 1.0, 0.0, 0.0, 1.0], dtype=np.float64)
     facet = np.zeros((1), dtype=np.int32)
     # TODO Check this
-    quad_perm = np.array((0), dtype=np.uint8)
+    quad_perm = np.array([0], dtype=np.uint8)
 
     for i in range(nfacets):
         A.fill(0)
@@ -177,3 +181,60 @@ def test_facet_space_custom_kernel():
             ffi.cast('uint8_t * ', quad_perm.ctypes.data),
             0)
         assert np.allclose(A, As_sympy[i])
+
+
+def test_facet_space_custom_kernel_assemble():
+    # TODO Try just assembling over facets
+    mesh = RectangleMesh(
+        MPI.COMM_WORLD,
+        [np.array([0, 0, 0]), np.array([1, 1, 0])], [1, 1],
+        CellType.triangle, dolfinx.cpp.mesh.GhostMode.none,
+        diagonal="right")
+    V = FunctionSpace(mesh, ("DGT", 1))
+    u = TrialFunction(V)
+    v = TestFunction(V)
+    ele_space_dim = V.dolfin_element().space_dimension()
+    nfacets = mesh.ufl_cell().num_facets()
+
+    a = u * v * ds
+
+    forms = [a]
+    c_type = "double"
+    compiled_forms, module = ffcx.codegeneration.jit.compile_forms(
+        forms, parameters={"scalar_type": c_type})
+
+    ffi = cffi.FFI()
+    integral_a_facet = \
+        compiled_forms[0][0].create_exterior_facet_integral(-1).tabulate_tensor
+
+    c_signature = numba.types.void(
+        numba.types.CPointer(numba.typeof(PETSc.ScalarType())),
+        numba.types.CPointer(numba.typeof(PETSc.ScalarType())),
+        numba.types.CPointer(numba.typeof(PETSc.ScalarType())),
+        numba.types.CPointer(numba.types.double),
+        numba.types.CPointer(numba.types.int32),
+        numba.types.CPointer(numba.types.int32))
+
+    @numba.cfunc(c_signature, nopython=True)
+    def tabulate_tensor_A(A_, w_, c_, coords_, entity_local_index,
+                          cell_orientation):
+        A = numba.carray(A_, (ele_space_dim, ele_space_dim),
+                         dtype=PETSc.ScalarType)
+        facet = np.zeros((1), dtype=np.int32)
+        quad_perm = np.array([0], dtype=np.uint8)
+        for i in range(nfacets):
+            facet[0] = i
+            # TODO Check what quad perm should be. Looking at auto-generated
+            # code, the last parameter doesn't seem to be used
+            integral_a_facet(ffi.from_buffer(A), w_, c_, coords_,
+                             ffi.from_buffer(facet),
+                             ffi.from_buffer(quad_perm), 0)
+
+    integrals = {dolfinx.fem.IntegralType.cell:
+                 ([(-1, tabulate_tensor_A.address)], None)}
+    a_form = dolfinx.cpp.fem.Form([V._cpp_object, V._cpp_object],
+                                  integrals, [], [], False)
+    A = dolfinx.fem.assemble_matrix(a_form)
+    A.assemble()
+    print(A)
+    # TODO Finish test.
