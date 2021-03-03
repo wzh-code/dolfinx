@@ -52,6 +52,9 @@ def test_facet_space(k):
 
     print(f.vector[:])
 
+    # FIXME inner(f("-"), f("-")) * ds seems problematic and isn't needed.
+    # The notation also doesn't make much sense in this context
+    # TODO Check if this causes problems in DG spaces
     integral_h = mesh.mpi_comm().allreduce(assemble_scalar(
         inner(f("-"), f("-")) * (dS + ds)), op=MPI.SUM)
     print(integral)
@@ -104,8 +107,9 @@ def test_facet_space_with_manual_interpolation():
 
     print(f.vector[:])
 
+    # FIXME f("-") etc. notation doesn't really make sense here.
     integral_h = mesh.mpi_comm().allreduce(assemble_scalar(
-        inner(f("-"), f("-")) * (dS + ds)), op=MPI.SUM)
+        inner(f, f) * ds + inner(f("-"), f("-")) * dS), op=MPI.SUM)
     print(integral)
     print(integral_h)
 
