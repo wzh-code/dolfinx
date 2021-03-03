@@ -244,7 +244,6 @@ def test_facet_space_custom_kernel_assemble():
     c_facet_point = mesh.topology.connectivity(1, 0)
 
     # FIXME Horrible hacky temporary method
-    # FIXME Don't specify size manually
     n = V.dofmap.index_map.size_global  # TODO Is this correct?
     A_sympy_assemble = np.zeros((n, n))
     for element in range(c_cell_facet.num_nodes):
