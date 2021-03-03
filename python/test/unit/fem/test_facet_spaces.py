@@ -108,6 +108,8 @@ def test_facet_space_with_manual_interpolation():
     print(f.vector[:])
 
     # FIXME f("-") etc. notation doesn't really make sense here.
+    # FIXME Skipping interpolation and setting e.g. data[0] = 1 and rest to 0
+    # above seems seems to indicate a bug in the assembly
     integral_h = mesh.mpi_comm().allreduce(assemble_scalar(
         inner(f, f) * ds + inner(f("-"), f("-")) * dS), op=MPI.SUM)
     print(integral)
