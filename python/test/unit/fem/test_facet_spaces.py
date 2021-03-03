@@ -196,6 +196,8 @@ def test_facet_space_custom_kernel_assemble():
     ele_space_dim = V.dolfin_element().space_dimension()
     nfacets = mesh.ufl_cell().num_facets()
 
+    # NOTE Assembling this as below (cellwise over boundaries) will
+    # give a contribution from each element on the shared diagonal.
     a = u * v * ds
 
     forms = [a]
@@ -236,5 +238,32 @@ def test_facet_space_custom_kernel_assemble():
                                   integrals, [], [], False)
     A = dolfinx.fem.assemble_matrix(a_form)
     A.assemble()
-    print(A)
-    # TODO Finish test.
+
+    mesh.topology.create_connectivity_all()
+    c_cell_facet = mesh.topology.connectivity(2, 1)
+    c_facet_point = mesh.topology.connectivity(1, 0)
+
+    # FIXME Horrible hacky temporary method
+    # FIXME Don't specify size manually
+    n = V.dofmap.index_map.size_global  # TODO Is this correct?
+    A_sympy_assemble = np.zeros((n, n))
+    for element in range(c_cell_facet.num_nodes):
+        for facet in c_cell_facet.links(element):
+            points = c_facet_point.links(facet)
+            h_facet = np.linalg.norm(
+                mesh.geometry.x[points[0]] - mesh.geometry.x[points[1]])
+            if np.isclose(h_facet, 1):
+                A_e_sym = sympy_element_tensor(
+                    Curve([t, 0], (t, 0, 1)), [1 - x, x])
+            else:
+                A_e_sym = sympy_element_tensor(
+                    Curve([t, 1 - t], (t, 0, 1)), [y, x])
+            for i in range(2):
+                for j in range(2):
+                    dofs = V.dofmap.cell_dofs(facet)
+                    A_sympy_assemble[dofs[i], dofs[j]] += A_e_sym[i, j]
+    print("FEniCS:")
+    print(A[:, :])
+    print("Sympy:")
+    print(A_sympy_assemble)
+    assert(np.allclose(A[:, :], A_sympy_assemble))
