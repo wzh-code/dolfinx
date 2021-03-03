@@ -116,3 +116,64 @@ def test_facet_space_with_manual_interpolation():
     print(integral_h)
 
     assert np.isclose(integral, integral_h)
+
+
+def sympy_element_tensor(facet, phi):
+    n = len(phi)
+    A = np.zeros((n, n))
+    for i in range(n):
+        for j in range(n):
+            A[i, j] = \
+                float(line_integrate(phi[i] * phi[j], facet, [x, y]).evalf())
+    return A
+
+
+def test_facet_space_custom_kernel():
+    # Compute tensor for each facet using sympy
+    As_sympy = [sympy_element_tensor(Curve([t, 1 - t], (t, 0, 1)), [y, x]),
+                sympy_element_tensor(Curve([t, 0], (t, 0, 1)), [1 - x, x]),
+                sympy_element_tensor(Curve([0, t], (t, 0, 1)), [1 - y, y])]
+
+    # Compute with FEniCS
+    mesh = RectangleMesh(
+        MPI.COMM_WORLD,
+        [np.array([0, 0, 0]), np.array([1, 1, 0])], [1, 1],
+        CellType.triangle, dolfinx.cpp.mesh.GhostMode.none,
+        diagonal="right")
+    V = FunctionSpace(mesh, ("DGT", 1))
+    u = TrialFunction(V)
+    v = TestFunction(V)
+    ele_space_dim = V.dolfin_element().space_dimension()
+    nfacets = mesh.ufl_cell().num_facets()
+
+    a = u * v * ds
+
+    forms = [a]
+    c_type, np_type = "double", np.float64
+    compiled_forms, module = ffcx.codegeneration.jit.compile_forms(
+        forms, parameters={"scalar_type": c_type})  # , cache_dir=".")
+
+    ffi = cffi.FFI()
+    integral_a_facet = \
+        compiled_forms[0][0].create_exterior_facet_integral(-1).tabulate_tensor
+
+    A = np.zeros((ele_space_dim, ele_space_dim), dtype=np_type)
+    w = np.array([], dtype=np_type)
+    c = np.array([], dtype=np_type)
+    coords = np.array([0.0, 0.0, 1.0, 0.0, 0.0, 1.0], dtype=np.float64)
+    facet = np.zeros((1), dtype=np.int32)
+    # TODO Check this
+    quad_perm = np.array((0), dtype=np.uint8)
+
+    for i in range(nfacets):
+        A.fill(0)
+        facet[0] = i
+        integral_a_facet(
+            ffi.cast('{type} *'.format(type=c_type), A.ctypes.data),
+            ffi.cast('{type} *'.format(type=c_type), w.ctypes.data),
+            ffi.cast('{type} *'.format(type=c_type), c.ctypes.data),
+            ffi.cast('double *', coords.ctypes.data),
+            ffi.cast('int *', facet.ctypes.data),
+            ffi.cast('uint8_t * ', quad_perm.ctypes.data),
+            0)
+        assert np.allclose(A, As_sympy[i])
