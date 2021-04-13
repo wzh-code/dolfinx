@@ -7,13 +7,16 @@
 #pragma once
 
 #include "FunctionSpace.h"
+#include <basix/finite-element.h>
 #include <dolfinx/common/span.hpp>
 #include <dolfinx/fem/DofMap.h>
 #include <dolfinx/fem/FiniteElement.h>
 #include <dolfinx/mesh/Mesh.h>
 #include <functional>
 #include <variant>
+#include <xtensor-blas/xlinalg.hpp>
 #include <xtensor/xtensor.hpp>
+#include <xtensor/xview.hpp>
 
 namespace dolfinx::fem
 {
@@ -89,40 +92,133 @@ namespace detail
 template <typename T>
 void interpolate_from_any(Function<T>& u, const Function<T>& v)
 {
-  assert(v.function_space());
-  const auto element = u.function_space()->element();
-  assert(element);
-  if (v.function_space()->element()->hash() != element->hash())
-  {
-    throw std::runtime_error("Restricting finite elements function in "
-                             "different elements not supported.");
-  }
 
   const auto mesh = u.function_space()->mesh();
   assert(mesh);
+  const int tdim = mesh->topology().dim();
+  const int gdim = mesh->geometry().dim();
+
+  auto map = mesh->topology().index_map(tdim);
+  assert(map);
+  const int num_cells = map->size_local() + map->num_ghosts();
+
+  assert(v.function_space());
   assert(v.function_space()->mesh());
+
   if (mesh->id() != v.function_space()->mesh()->id())
   {
     throw std::runtime_error(
         "Interpolation on different meshes not supported (yet).");
   }
-  const int tdim = mesh->topology().dim();
 
   // Get dofmaps
-  assert(v.function_space());
   std::shared_ptr<const fem::DofMap> dofmap_v = v.function_space()->dofmap();
   assert(dofmap_v);
-  auto map = mesh->topology().index_map(tdim);
-  assert(map);
 
   std::vector<T>& coeffs = u.x()->mutable_array();
 
   // Iterate over mesh and interpolate on each cell
   const auto dofmap_u = u.function_space()->dofmap();
   const std::vector<T>& v_array = v.x()->array();
-  const int num_cells = map->size_local() + map->num_ghosts();
-  const int bs = dofmap_v->bs();
-  assert(bs == dofmap_u->bs());
+
+  const int bs_v = dofmap_v->bs();
+  const int bs_u = dofmap_u->bs();
+
+  const std::shared_ptr<const FiniteElement> element
+      = u.function_space()->element();
+  assert(element);
+  if (v.function_space()->element()->hash() != element->hash())
+  {
+    const std::shared_ptr<const FiniteElement> e_v
+        = v.function_space()->element();
+    std::shared_ptr<const basix::FiniteElement> element_u
+        = element->basix_element();
+    std::shared_ptr<const basix::FiniteElement> element_v
+        = e_v->basix_element();
+
+    mesh->topology_mutable().create_entity_permutations();
+    const std::vector<std::uint32_t>& cell_info
+        = mesh->topology().get_cell_permutation_info();
+
+    // Interpolation matrix for u
+    const xt::xtensor<double, 2>& int_matrix
+        = element_u->interpolation_matrix();
+
+    // Basis functions from v at interpolation points from u
+    const xt::xtensor<double, 2>& points_u = element_u->points();
+
+    // Create data structures for Jacobian info
+    std::vector<double> J(points_u.shape(0) * gdim * tdim);
+    std::vector<double> detJ(points_u.shape(0));
+    std::vector<double> K(points_u.shape(0) * tdim * gdim);
+    // Get coordinate map
+    const fem::CoordinateElement& cmap = mesh->geometry().cmap();
+    // Get geometry data
+    const graph::AdjacencyList<std::int32_t>& x_dofmap
+        = mesh->geometry().dofmap();
+    // FIXME: Add proper interface for num coordinate dofs
+    const int num_dofs_g = x_dofmap.num_links(0);
+    const array2d<double>& x_g = mesh->geometry().x();
+
+    array2d<double> coordinate_dofs(num_dofs_g, gdim);
+
+    /// - The first index is the derivative, with higher derivatives are
+    /// stored in triangular (2D) or tetrahedral (3D) ordering, i.e. for
+    /// the (x,y) derivatives in 2D: (0,0), (1,0), (0,1), (2,0), (1,1),
+    /// (0,2), (3,0)... The function basix::idx can be used to find the
+    /// appropriate derivative.
+    /// - The second index is the point index
+    /// - The third index is the basis function index
+    /// - The fourth index is the basis function component. Its has size
+    /// one for scalar basis functions.
+    xt::xtensor<double, 4> basis_v = element_v->tabulate(1, points_u);
+    const int vs_u = element_u->value_size();
+    const int vs_v = element_v->value_size();
+    for (int c = 0; c < num_cells; ++c)
+    {
+      tcb::span<const std::int32_t> dofs_v = dofmap_v->cell_dofs(c);
+      tcb::span<const std::int32_t> dofs_u = dofmap_u->cell_dofs(c);
+      auto x_dofs = x_dofmap.links(c);
+      for (int i = 0; i < num_dofs_g; ++i)
+        for (int j = 0; j < gdim; ++j)
+          coordinate_dofs(i, j) = x_g(x_dofs[i], j);
+
+      // Compute J, detJ and K
+      cmap.compute_jacobian_data(basis_v, coordinate_dofs, J, detJ, K);
+
+      xt::xtensor<T, 3> block_values
+          = xt::zeros<T>({points_u.shape(0), dofs_v.size(), vs_v});
+      xt::xarray<T> reference_data = xt::zeros<T>({dofs_v.size()});
+      for (int i = 0; i < bs_v; ++i)
+      {
+        // Get element degrees of freedom for scalar space
+        for (std::size_t k = 0; k < dofs_v.size(); ++k)
+        {
+          reference_data[k] = v_array[dofs_v[k] * bs_v + i];
+        }
+        for (int j = 0; j < vs_v; ++j)
+        {
+          e_v->apply_dof_transformation(reference_data.data(), cell_info[c], 1);
+          // Compute phi*block_values
+          xt::xtensor<double, 2> phi
+              = xt::view(basis_v, 0, xt::all(), xt::all(), j);
+          xt::view(block_values, xt::all(), xt::all(), j)
+              = xt::linalg::dot(phi, reference_data);
+        }
+        auto something = element_v->map_pull_back(block_values, J, detJ, K);
+
+        // Multiply something my interpolation matrix
+        // ,,,,,,,,,
+        // element_v->apply_inverse_transpose_dof_transformation(_coeffs.data(),
+        //                                                     cell_info[c],
+        //                                                     1);
+      }
+    }
+    throw std::runtime_error("Restricting finite elements function in "
+                             "different elements not supported.");
+  }
+
+  assert(bs_u == bs_v);
   for (int c = 0; c < num_cells; ++c)
   {
     tcb::span<const std::int32_t> dofs_v = dofmap_v->cell_dofs(c);
@@ -130,8 +226,8 @@ void interpolate_from_any(Function<T>& u, const Function<T>& v)
     assert(dofs_v.size() == cell_dofs.size());
     for (std::size_t i = 0; i < dofs_v.size(); ++i)
     {
-      for (int k = 0; k < bs; ++k)
-        coeffs[bs * cell_dofs[i] + k] = v_array[bs * dofs_v[i] + k];
+      for (int k = 0; k < bs_v; ++k)
+        coeffs[bs_v * cell_dofs[i] + k] = v_array[bs_v * dofs_v[i] + k];
     }
   }
 }
@@ -280,11 +376,9 @@ void interpolate(
     const array2d<double>& x_g = mesh->geometry().x();
 
     // Create data structures for Jacobian info
-    array2d<double> x_cell(X.shape[0], gdim);
     std::vector<double> J(X.shape[0] * gdim * tdim);
     std::vector<double> detJ(X.shape[0]);
     std::vector<double> K(X.shape[0] * tdim * gdim);
-    array2d<double> X_ref(X.shape[0], tdim);
 
     array2d<double> coordinate_dofs(num_dofs_g, gdim);
 
@@ -302,8 +396,7 @@ void interpolate(
           coordinate_dofs(i, j) = x_g(x_dofs[i], j);
 
       // Compute J, detJ and K
-      cmap.compute_jacobian_data(tabulated_data, X, coordinate_dofs, J, detJ,
-                                 K);
+      cmap.compute_jacobian_data(tabulated_data, coordinate_dofs, J, detJ, K);
 
       tcb::span<const std::int32_t> dofs = dofmap->cell_dofs(c);
       for (int k = 0; k < element_bs; ++k)

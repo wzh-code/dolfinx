@@ -6,6 +6,7 @@
 
 #include "FiniteElement.h"
 #include <basix.h>
+#include <basix/finite-element.h>
 #include <dolfinx/common/log.h>
 #include <functional>
 #include <ufc.h>
@@ -77,6 +78,8 @@ FiniteElement::FiniteElement(const ufc_finite_element& ufc_element)
   }
   else
   {
+    _element = std::make_shared<basix::FiniteElement>(basix::create_element(
+        family.c_str(), cell_shape.c_str(), ufc_element.degree));
     _basix_element_handle = basix::register_element(
         family.c_str(), cell_shape.c_str(), ufc_element.degree);
     std::vector<int> value_shape(basix::value_rank(_basix_element_handle));
@@ -280,6 +283,12 @@ FiniteElement::extract_sub_element(const FiniteElement& finite_element,
 
   return extract_sub_element(*sub_element, sub_component);
 }
+//-----------------------------------------------------------------------------
+std::shared_ptr<const basix::FiniteElement> FiniteElement::basix_element() const
+{
+  return _element;
+}
+
 //-----------------------------------------------------------------------------
 bool FiniteElement::interpolation_ident() const noexcept
 {

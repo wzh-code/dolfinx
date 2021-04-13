@@ -14,8 +14,13 @@
 #include <numeric>
 #include <vector>
 
+// Forward declarations
 struct ufc_coordinate_mapping;
 struct ufc_finite_element;
+namespace basix
+{
+class FiniteElement;
+}
 
 namespace dolfinx::fem
 {
@@ -86,8 +91,8 @@ public:
   void evaluate_reference_basis(std::vector<double>& values,
                                 const array2d<double>& X) const;
 
-  /// Evaluate all basis function derivatives of given order at given points in
-  /// reference cell
+  /// Evaluate all basis function derivatives of given order at given points
+  /// in reference cell
   // reference_value_derivatives[num_points][num_dofs][reference_value_size][num_derivatives]
   void
   evaluate_reference_basis_derivatives(std::vector<double>& reference_values,
@@ -120,6 +125,9 @@ public:
   std::shared_ptr<const FiniteElement>
   extract_sub_element(const std::vector<int>& component) const;
 
+  /// Return shared_ptr to basix element
+  std::shared_ptr<const basix::FiniteElement> basix_element() const;
+
   /// Check if interpolation into the finite element space is an
   /// identity operation given the evaluation on an expression at
   /// specific points, i.e. the degree-of-freedom are equal to point
@@ -140,7 +148,7 @@ public:
   /// @todo Make the interpolating dofs in/out argument for efficiency
   /// as this function is often called from within tight loops
   /// @todo Consider handling block size > 1
-  /// @todo Re-work for fields that require a pull-back, e.g. Piols
+  /// @todo Re-work for fields that require a pull-back, e.g. Piola
   /// mapped elements
   ///
   /// Interpolate a function in the finite element space on a cell.
@@ -154,8 +162,7 @@ public:
   /// @param[out] dofs The element degrees of freedom (interpolants) of
   /// the expression. The call must allocate the space. Is has
   template <typename T>
-  constexpr void interpolate(const array2d<T>& values,
-                             tcb::span<T> dofs) const
+  constexpr void interpolate(const array2d<T>& values, tcb::span<T> dofs) const
   {
     const std::size_t rows = _space_dim / _bs;
     assert(_space_dim % _bs == 0);
@@ -272,6 +279,7 @@ private:
 
   // The basix element identifier
   int _basix_element_handle;
+  std::shared_ptr<basix::FiniteElement> _element;
 
   // The interpolation matrix. It has shape (dim,
   // num_interpolation_points*basix_value_size). Note that _space_dim =

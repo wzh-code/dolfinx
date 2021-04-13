@@ -253,12 +253,12 @@ CoordinateElement::tabulate(int n, const array2d<double>& X) const
 //-----------------------------------------------------------------------------
 
 void CoordinateElement::compute_jacobian_data(
-    const xt::xtensor<double, 4>& tabulated_data, const array2d<double>& X,
+    const xt::xtensor<double, 4>& tabulated_data,
     const array2d<double>& cell_geometry, std::vector<double>& J,
     tcb::span<double> detJ, std::vector<double>& K) const
 {
   // Number of points
-  int num_points = X.shape[0];
+  int num_points = detJ.size();
   if (num_points == 0)
     return;
 
@@ -268,10 +268,7 @@ void CoordinateElement::compute_jacobian_data(
   assert(int(cell_geometry.shape[1]) == gdim);
 
   // In/out size checks
-  assert(X.shape[0] == std::size_t(num_points));
-  assert(X.shape[1] == std::size_t(tdim));
   assert((int)J.size() == num_points * gdim * tdim);
-  assert((int)detJ.size() == num_points);
   assert((int)K.size() == num_points * gdim * tdim);
 
   const int d = cell_geometry.shape[0];
