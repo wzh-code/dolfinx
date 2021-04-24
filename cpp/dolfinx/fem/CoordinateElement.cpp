@@ -198,7 +198,7 @@ ElementDofLayout CoordinateElement::dof_layout() const
 //-----------------------------------------------------------------------------
 void CoordinateElement::push_forward(
     xt::xtensor<double, 2>& x, const xt::xtensor<double, 2>& cell_geometry,
-    const xt::xtensor<double, 2>& phi) const
+    const xt::xtensor<double, 2>& phi)
 {
   assert(phi.shape(1) == cell_geometry.shape(0));
 

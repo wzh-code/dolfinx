@@ -47,12 +47,18 @@
 #include <xtensor/xtensor.hpp>
 #include <xtensor/xview.hpp>
 
+#define FORCE_IMPORT_ARRAY
+#include <xtensor-python/pyarray.hpp>
+#include <xtensor-python/pytensor.hpp>
+
 namespace py = pybind11;
 
 namespace dolfinx_wrappers
 {
 void fem(py::module& m)
 {
+  xt::import_numpy();
+
   // utils
   m.def("create_vector_block", &dolfinx::fem::create_vector_block,
         py::return_value_policy::take_ownership,
@@ -157,15 +163,8 @@ void fem(py::module& m)
         return dolfinx::fem::FiniteElement(*p);
       }))
       .def("num_sub_elements", &dolfinx::fem::FiniteElement::num_sub_elements)
-      .def("interpolation_points",
-           [](const dolfinx::fem::FiniteElement& self) {
-             const xt::xtensor<double, 2>& x = self.interpolation_points();
-
-             // FIXME: Set read-only flag and return wrapper
-             return py::array_t<double>(x.shape(), x.data());
-             //  return py::array_t<double>(x.shape(), x.data(),
-             //  py::cast(self));
-           })
+      .def_property_readonly("interpolation_points",
+                             &dolfinx::fem::FiniteElement::interpolation_points)
       .def_property_readonly("interpolation_ident",
                              &dolfinx::fem::FiniteElement::interpolation_ident)
       .def_property_readonly("value_rank",
@@ -232,25 +231,14 @@ void fem(py::module& m)
                              &dolfinx::fem::CoordinateElement::dof_layout)
       .def("push_forward",
            [](const dolfinx::fem::CoordinateElement& self,
-              const py::array_t<double, py::array::c_style>& X,
-              const py::array_t<double, py::array::c_style>& cell_geometry) {
-             std::array<std::size_t, 2> s_x
-                 = {static_cast<std::size_t>(X.shape(0)),
-                    static_cast<std::size_t>(X.shape(1))};
-             auto _X = xt::adapt(X.data(), X.size(), xt::no_ownership(), s_x);
-             std::array<std::size_t, 2> s_g
-                 = {static_cast<std::size_t>(cell_geometry.shape(0)),
-                    static_cast<std::size_t>(cell_geometry.shape(1))};
-             auto g = xt::adapt(cell_geometry.data(), cell_geometry.size(),
-                                xt::no_ownership(), s_g);
-
+              const xt::pytensor<double, 2>& X,
+              const xt::pytensor<double, 2>& cell_geometry) {
              xt::xtensor<double, 2> x = xt::empty<double>(
-                 {_X.shape(0), std::size_t(cell_geometry.shape(1))});
+                 {X.shape(0), std::size_t(cell_geometry.shape(1))});
              const xt::xtensor<double, 2> phi
-                 = xt::view(self.tabulate(0, _X), 0, xt::all(), xt::all(), 0);
-
-             self.push_forward(x, g, phi);
-             return xt_as_pyarray(std::move(x));
+                 = xt::view(self.tabulate(0, X), 0, xt::all(), xt::all(), 0);
+             self.push_forward(x, cell_geometry, phi);
+             return x;
            })
       .def_readwrite("non_affine_atol",
                      &dolfinx::fem::CoordinateElement::non_affine_atol)
@@ -276,8 +264,7 @@ void fem(py::module& m)
       .def(py::init(
           [](const std::shared_ptr<const dolfinx::fem::Function<PetscScalar>>&
                  g,
-             const std::array<py::array_t<std::int32_t, py::array::c_style>, 2>&
-                 V_g_dofs,
+             const std::array<xt::pytensor<std::int32_t, 1>, 2>& V_g_dofs,
              const std::shared_ptr<const dolfinx::fem::FunctionSpace>& V) {
             std::array dofs = {std::vector<std::int32_t>(
                                    V_g_dofs[0].data(),
@@ -396,23 +383,23 @@ void fem(py::module& m)
       "Modify vector for lifted boundary conditions");
   m.def(
       "set_bc",
-      [](py::array_t<PetscScalar, py::array::c_style> b,
+      [](xt::pytensor<PetscScalar, 1> b,
          const std::vector<std::shared_ptr<
              const dolfinx::fem::DirichletBC<PetscScalar>>>& bcs,
-         const py::array_t<PetscScalar, py::array::c_style>& x0, double scale) {
-        if (x0.ndim() == 0)
-        {
-          dolfinx::fem::set_bc<PetscScalar>(
-              xtl::span(b.mutable_data(), b.size()), bcs, scale);
-        }
-        else if (x0.ndim() == 1)
-        {
-          dolfinx::fem::set_bc<PetscScalar>(
-              xtl::span(b.mutable_data(), b.size()), bcs,
-              xtl::span(x0.data(), x0.shape(0)), scale);
-        }
-        else
-          throw std::runtime_error("Wrong array dimension.");
+         const xt::pytensor<PetscScalar, 1>& x0, double scale) {
+        // if (x0.ndim() == 0)
+        // {
+        //   dolfinx::fem::set_bc<PetscScalar>(
+        //       xtl::span(b.mutable_data(), b.size()), bcs, scale);
+        // }
+        // else if (x0.ndim() == 1)
+        // {
+        dolfinx::fem::set_bc<PetscScalar>(xtl::span(b.data(), b.size()), bcs,
+                                          xtl::span(x0.data(), x0.shape(0)),
+                                          scale);
+        // }
+        // else
+        //   throw std::runtime_error("Wrong array dimension.");
       },
       py::arg("b"), py::arg("bcs"), py::arg("x0") = py::none(),
       py::arg("scale") = 1.0);
