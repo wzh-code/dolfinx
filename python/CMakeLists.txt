@@ -17,7 +17,7 @@ if(NOT xtensor-python_FOUND)
   message("downloading xtensor-python source...")
   FetchContent_Declare(
     xtensor-python
-    GIT_REPOSITORY git@github.com:xtensor-stack/xtensor-python.git
+    GIT_REPOSITORY https://github.com/xtensor-stack/xtensor-python.git
     GIT_TAG        0.25.1
   )
   FetchContent_MakeAvailable(xtensor-python)
