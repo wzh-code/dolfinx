@@ -26,6 +26,8 @@ def test_locate_dofs_geometrical():
 
     dofs = dolfinx.fem.locate_dofs_geometrical(
         (W.sub(0), V), lambda x: np.isclose(x.T, [0, 0, 0]).all(axis=1))
+    print(dofs[0].flags)
+    print(dofs[1].flags)
 
     # Collect dofs (global indices) from all processes
     dofs0_global = W.sub(0).dofmap.index_map.local_to_global(dofs[0])

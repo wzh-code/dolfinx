@@ -383,23 +383,23 @@ void fem(py::module& m)
       "Modify vector for lifted boundary conditions");
   m.def(
       "set_bc",
-      [](xt::pytensor<PetscScalar, 1> b,
+      [](py::array_t<PetscScalar, py::array::c_style> b,
          const std::vector<std::shared_ptr<
              const dolfinx::fem::DirichletBC<PetscScalar>>>& bcs,
-         const xt::pytensor<PetscScalar, 1>& x0, double scale) {
-        // if (x0.ndim() == 0)
-        // {
-        //   dolfinx::fem::set_bc<PetscScalar>(
-        //       xtl::span(b.mutable_data(), b.size()), bcs, scale);
-        // }
-        // else if (x0.ndim() == 1)
-        // {
-        dolfinx::fem::set_bc<PetscScalar>(xtl::span(b.data(), b.size()), bcs,
-                                          xtl::span(x0.data(), x0.shape(0)),
-                                          scale);
-        // }
-        // else
-        //   throw std::runtime_error("Wrong array dimension.");
+         const py::array_t<PetscScalar, py::array::c_style>& x0, double scale) {
+        if (x0.ndim() == 0)
+        {
+          dolfinx::fem::set_bc<PetscScalar>(
+              xtl::span(b.mutable_data(), b.size()), bcs, scale);
+        }
+        else if (x0.ndim() == 1)
+        {
+          dolfinx::fem::set_bc<PetscScalar>(
+              xtl::span(b.mutable_data(), b.size()), bcs,
+              xtl::span(x0.data(), x0.shape(0)), scale);
+        }
+        else
+          throw std::runtime_error("Wrong array dimension.");
       },
       py::arg("b"), py::arg("bcs"), py::arg("x0") = py::none(),
       py::arg("scale") = 1.0);
@@ -525,22 +525,13 @@ void fem(py::module& m)
       "locate_dofs_geometrical",
       [](const std::vector<
              std::reference_wrapper<const dolfinx::fem::FunctionSpace>>& V,
-         const std::function<py::array_t<bool>(const py::array_t<double>&)>&
-             marker) -> std::array<py::array, 2> {
+         const std::function<xt::pytensor<bool, 1>(
+             const xt::pytensor<double, 2>&)>& marker)
+          -> std::array<py::array_t<std::int32_t>, 2> {
         if (V.size() != 2)
           throw std::runtime_error("Expected two function spaces.");
-
-        auto _marker =
-            [&marker](const xt::xtensor<double, 2>& x) -> xt::xtensor<bool, 1> {
-          auto strides = x.strides();
-          std::transform(strides.begin(), strides.end(), strides.begin(),
-                         [](auto s) { return s * sizeof(double); });
-          py::array_t _x(x.shape(), strides, x.data(), py::none());
-          py::array_t m = marker(_x);
-          std::vector<std::size_t> s(m.shape(), m.shape() + m.ndim());
-          return xt::adapt(m.data(), m.size(), xt::no_ownership(), s);
-        };
-
+        auto _marker = [&marker](const xt::xtensor<double, 2>& x)
+            -> xt::pytensor<bool, 1> { return marker(x); };
         std::array<std::vector<std::int32_t>, 2> dofs
             = dolfinx::fem::locate_dofs_geometrical({V[0], V[1]}, _marker);
         return {as_pyarray(std::move(dofs[0])), as_pyarray(std::move(dofs[1]))};
@@ -551,16 +542,8 @@ void fem(py::module& m)
       [](const dolfinx::fem::FunctionSpace& V,
          const std::function<py::array_t<bool>(const py::array_t<double>&)>&
              marker) {
-        auto _marker =
-            [&marker](const xt::xtensor<double, 2>& x) -> xt::xtensor<bool, 1> {
-          auto strides = x.strides();
-          std::transform(strides.begin(), strides.end(), strides.begin(),
-                         [](auto s) { return s * sizeof(double); });
-          py::array_t _x(x.shape(), strides, x.data(), py::none());
-          py::array_t m = marker(_x);
-          std::vector<std::size_t> s(m.shape(), m.shape() + m.ndim());
-          return xt::adapt(m.data(), m.size(), xt::no_ownership(), s);
-        };
+        auto _marker = [&marker](const xt::xtensor<double, 2>& x)
+            -> xt::pytensor<bool, 1> { return marker(x); };
         return as_pyarray(dolfinx::fem::locate_dofs_geometrical(V, _marker));
       },
       py::arg("V"), py::arg("marker"));
