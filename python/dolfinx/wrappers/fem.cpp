@@ -540,8 +540,8 @@ void fem(py::module& m)
   m.def(
       "locate_dofs_geometrical",
       [](const dolfinx::fem::FunctionSpace& V,
-         const std::function<py::array_t<bool>(const py::array_t<double>&)>&
-             marker) {
+         const std::function<xt::pytensor<bool, 1>(
+             const xt::pytensor<double, 2>&)>& marker) {
         auto _marker = [&marker](const xt::xtensor<double, 2>& x)
             -> xt::pytensor<bool, 1> { return marker(x); };
         return as_pyarray(dolfinx::fem::locate_dofs_geometrical(V, _marker));
@@ -565,20 +565,10 @@ void fem(py::module& m)
       .def(
           "interpolate",
           [](dolfinx::fem::Function<PetscScalar>& self,
-             const std::function<py::array_t<PetscScalar>(
-                 const py::array_t<double>&)>& f) {
+             const std::function<xt::pyarray<PetscScalar>(
+                 const xt::pytensor<double, 2>&)>& f) {
             auto _f = [&f](const xt::xtensor<double, 2>& x)
-                -> xt::xarray<PetscScalar> {
-              auto strides = x.strides();
-              std::transform(strides.begin(), strides.end(), strides.begin(),
-                             [](auto s) { return s * sizeof(double); });
-              py::array_t _x(x.shape(), strides, x.data(), py::none());
-              py::array_t v = f(_x);
-              std::vector<std::size_t> shape;
-              for (pybind11::ssize_t i = 0; i < v.ndim(); i++)
-                shape.push_back(v.shape()[i]);
-              return xt::adapt(v.data(), shape);
-            };
+                -> xt::xarray<PetscScalar> { return f(x); };
             self.interpolate(_f);
           },
           py::arg("f"), "Interpolate an expression")
@@ -592,11 +582,9 @@ void fem(py::module& m)
             const std::function<void(PetscScalar*, int, int, const double*)> f
                 = reinterpret_cast<void (*)(PetscScalar*, int, int,
                                             const double*)>(addr);
-
             auto _f = [&f](xt::xarray<PetscScalar>& values,
                            const xt::xtensor<double, 2>& x) -> void {
-              f(values.data(), int(values.shape(1)), int(values.shape(0)),
-                x.data());
+              f(values.data(), values.shape(1), values.shape(0), x.data());
             };
 
             assert(self.function_space());
