@@ -637,12 +637,9 @@ void fem(py::module& m)
           },
           py::arg("x"), py::arg("cells"), py::arg("values"),
           "Evaluate Function")
-      .def(
-          "compute_point_values",
-          [](const dolfinx::fem::Function<PetscScalar>& self) {
-            return xt_as_pyarray(self.compute_point_values());
-          },
-          "Compute values at all mesh points")
+      .def("compute_point_values",
+           &dolfinx::fem::Function<PetscScalar>::compute_point_values,
+           "Compute values at all mesh points")
       .def_property_readonly(
           "function_space",
           &dolfinx::fem::Function<PetscScalar>::function_space);
@@ -664,9 +661,8 @@ void fem(py::module& m)
       .def_property_readonly("dofmap", &dolfinx::fem::FunctionSpace::dofmap)
       .def("sub", &dolfinx::fem::FunctionSpace::sub)
       .def("tabulate_dof_coordinates",
-           [](const dolfinx::fem::FunctionSpace& self) {
-             return xt_as_pyarray(self.tabulate_dof_coordinates(false));
-           });
+           &dolfinx::fem::FunctionSpace::tabulate_dof_coordinates,
+           py::arg("transpose") = false);
 
   // dolfinx::fem::Constant
   py::class_<dolfinx::fem::Constant<PetscScalar>,
@@ -691,35 +687,22 @@ void fem(py::module& m)
                   const std::vector<std::shared_ptr<
                       const dolfinx::fem::Constant<PetscScalar>>>& constants,
                   const std::shared_ptr<const dolfinx::mesh::Mesh>& mesh,
-                  const py::array_t<double, py::array::c_style>& X,
-                  py::object addr, const std::size_t value_size) {
+                  const xt::pytensor<double, 2>& X, py::object addr,
+                  const std::size_t value_size) {
                  auto tabulate_expression_ptr = (void (*)(
                      PetscScalar*, const PetscScalar*, const PetscScalar*,
                      const double*))addr.cast<std::uintptr_t>();
-                 dolfinx::array2d<double> _X(X.shape()[0], X.shape()[1]);
-                 std::copy_n(X.data(), X.size(), _X.data());
                  return dolfinx::fem::Expression<PetscScalar>(
-                     coefficients, constants, mesh, _X, tabulate_expression_ptr,
+                     coefficients, constants, mesh, X, tabulate_expression_ptr,
                      value_size);
                }),
            py::arg("coefficients"), py::arg("constants"), py::arg("mesh"),
            py::arg("x"), py::arg("fn"), py::arg("value_size"))
       .def("eval",
            [](const dolfinx::fem::Expression<PetscScalar>& self,
-              const py::array_t<std::int32_t, py::array::c_style>& active_cells,
-              py::array_t<PetscScalar> values) {
-             dolfinx::array2d<PetscScalar> _values(active_cells.shape()[0],
-                                                   self.num_points()
-                                                       * self.value_size());
-             self.eval(xtl::span(active_cells.data(), active_cells.size()),
-                       _values);
-             assert(values.ndim() == 2);
-             assert(values.shape()[0] == (py::ssize_t)_values.shape[0]);
-             assert(values.shape()[1] == (py::ssize_t)_values.shape[1]);
-             auto v = values.mutable_unchecked();
-             for (py::ssize_t i = 0; i < v.shape(0); i++)
-               for (py::ssize_t j = 0; j < v.shape(1); j++)
-                 v(i, j) = _values(i, j);
+              const xt::pytensor<std::int32_t, 1>& active_cells,
+              xt::pytensor<PetscScalar, 2>& values) {
+             self.eval(active_cells, values);
            })
       .def_property_readonly("mesh",
                              &dolfinx::fem::Expression<PetscScalar>::mesh,

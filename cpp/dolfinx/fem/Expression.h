@@ -6,11 +6,11 @@
 
 #pragma once
 
-#include <dolfinx/common/array2d.h>
 #include <dolfinx/fem/evaluate.h>
 #include <functional>
 #include <utility>
 #include <vector>
+#include <xtensor/xtensor.hpp>
 #include <xtl/xspan.hpp>
 
 namespace dolfinx
@@ -51,7 +51,8 @@ public:
   Expression(
       const std::vector<std::shared_ptr<const fem::Function<T>>>& coefficients,
       const std::vector<std::shared_ptr<const fem::Constant<T>>>& constants,
-      const std::shared_ptr<const mesh::Mesh>& mesh, const array2d<double>& X,
+      const std::shared_ptr<const mesh::Mesh>& mesh,
+      const xt::xtensor<double, 2>& X,
       const std::function<void(T*, const T*, const T*, const double*)> fn,
       const std::size_t value_size)
       : _coefficients(coefficients), _constants(constants), _mesh(mesh), _x(X),
@@ -93,8 +94,8 @@ public:
   /// @param[out] values To store the result. Caller responsible for
   /// correct sizing which should be num_cells rows by
   /// num_points*value_size columns.
-  void eval(const xtl::span<const std::int32_t>& active_cells,
-            array2d<T>& values) const
+  template <typename U>
+  void eval(const xtl::span<const std::int32_t>& active_cells, U& values) const
   {
     fem::eval(values, *this, active_cells);
   }
@@ -122,7 +123,7 @@ public:
 
   /// Get evaluation points on reference cell
   /// @return Evaluation points
-  const array2d<double>& x() const { return _x; }
+  const xt::xtensor<double, 2>& x() const { return _x; }
 
   /// Get value size
   /// @return value_size
@@ -130,7 +131,7 @@ public:
 
   /// Get number of points
   /// @return number of points
-  const std::size_t num_points() const { return _x.shape[0]; }
+  const std::size_t num_points() const { return _x.shape(0); }
 
   /// Scalar type (T).
   using scalar_type = T;
@@ -146,7 +147,7 @@ private:
   std::function<void(T*, const T*, const T*, const double*)> _fn;
 
   // Evaluation points on reference cell
-  array2d<double> _x;
+  xt::xtensor<double, 2> _x;
 
   // The mesh.
   std::shared_ptr<const mesh::Mesh> _mesh;

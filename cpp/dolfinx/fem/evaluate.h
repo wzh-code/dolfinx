@@ -25,7 +25,7 @@ class Expression;
 /// @param[in] active_cells The cells on which to evaluate the
 /// expression
 template <typename T>
-void eval(array2d<T>& values, const fem::Expression<T>& e,
+void eval(T& values, const fem::Expression<typename T::value_type>& e,
           const xtl::span<const std::int32_t>& active_cells)
 {
   // Extract data from Expression
@@ -33,10 +33,12 @@ void eval(array2d<T>& values, const fem::Expression<T>& e,
   assert(mesh);
 
   // Prepare coefficients
-  const array2d<T> coeffs = dolfinx::fem::pack_coefficients(e);
+  const array2d<typename T::value_type> coeffs
+      = dolfinx::fem::pack_coefficients(e);
 
   // Prepare constants
-  const std::vector<T> constant_values = dolfinx::fem::pack_constants(e);
+  const std::vector<typename T::value_type> constant_values
+      = dolfinx::fem::pack_constants(e);
 
   const auto& fn = e.get_tabulate_expression();
 
@@ -59,11 +61,11 @@ void eval(array2d<T>& values, const fem::Expression<T>& e,
   std::vector<double> coordinate_dofs(num_dofs_g * gdim);
 
   // Iterate over cells and 'assemble' into values
-  std::vector<T> values_e(e.num_points() * e.value_size(), 0);
+  std::vector<typename T::value_type> values_e(e.num_points() * e.value_size(),
+                                               0);
   for (std::size_t c = 0; c < active_cells.size(); ++c)
   {
     const std::int32_t cell = active_cells[c];
-
     auto x_dofs = x_dofmap.links(c);
     for (std::size_t i = 0; i < x_dofs.size(); ++i)
     {
