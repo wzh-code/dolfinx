@@ -34,12 +34,12 @@ namespace dolfinx::fem::impl
 /// before assembly.
 /// @param[in] L The linear forms to assemble into b
 template <typename T>
-void assemble_vector(xtl::span<T> b, const Form<T>& L);
+void assemble_vector(const xtl::span<T>& b, const Form<T>& L);
 
 /// Execute kernel over cells and accumulate result in vector
 template <typename T>
 void assemble_cells(
-    xtl::span<T> b, const mesh::Geometry& geometry,
+    const xtl::span<T>& b, const mesh::Geometry& geometry,
     const std::vector<std::int32_t>& active_cells,
     const graph::AdjacencyList<std::int32_t>& dofmap, const int bs,
     const std::function<void(T*, const T*, const T*, const double*, const int*,
@@ -50,7 +50,7 @@ void assemble_cells(
 /// Execute kernel over cells and accumulate result in vector
 template <typename T>
 void assemble_exterior_facets(
-    xtl::span<T> b, const mesh::Mesh& mesh,
+    const xtl::span<T>& b, const mesh::Mesh& mesh,
     const std::vector<std::int32_t>& active_facets,
     const graph::AdjacencyList<std::int32_t>& dofmap, const int bs,
     const std::function<void(T*, const T*, const T*, const double*, const int*,
@@ -62,7 +62,7 @@ void assemble_exterior_facets(
 /// Assemble linear form interior facet integrals into an vector
 template <typename T>
 void assemble_interior_facets(
-    xtl::span<T> b, const mesh::Mesh& mesh,
+    const xtl::span<T>& b, const mesh::Mesh& mesh,
     const std::vector<std::int32_t>& active_facets, const fem::DofMap& dofmap,
     const std::function<void(T*, const T*, const T*, const double*, const int*,
                              const std::uint8_t*, const std::uint32_t)>& fn,
@@ -90,7 +90,7 @@ void assemble_interior_facets(
 /// @param[in] scale Scaling to apply
 template <typename T>
 void apply_lifting(
-    xtl::span<T> b, const std::vector<std::shared_ptr<const Form<T>>> a,
+    const xtl::span<T>& b, const std::vector<std::shared_ptr<const Form<T>>> a,
     const std::vector<std::vector<std::shared_ptr<const DirichletBC<T>>>>& bcs1,
     const xtl::span<const T>& x0, double scale);
 
@@ -107,7 +107,7 @@ void apply_lifting(
 /// solution' in a Newton method
 /// @param[in] scale Scaling to apply
 template <typename T>
-void lift_bc(xtl::span<T> b, const Form<T>& a,
+void lift_bc(const xtl::span<T>& b, const Form<T>& a,
              const xtl::span<const T>& bc_values1,
              const std::vector<bool>& bc_markers1, const xtl::span<const T>& x0,
              double scale);
@@ -115,7 +115,7 @@ void lift_bc(xtl::span<T> b, const Form<T>& a,
 // Implementation of bc application
 template <typename T>
 void _lift_bc_cells(
-    xtl::span<T> b, const mesh::Geometry& geometry,
+    const xtl::span<T>& b, const mesh::Geometry& geometry,
     const std::function<void(T*, const T*, const T*, const double*, const int*,
                              const std::uint8_t*, const std::uint32_t)>& kernel,
     const std::vector<std::int32_t>& active_cells,
@@ -209,7 +209,7 @@ void _lift_bc_cells(
 //----------------------------------------------------------------------------
 template <typename T>
 void _lift_bc_exterior_facets(
-    xtl::span<T> b, const mesh::Mesh& mesh,
+    const xtl::span<T>& b, const mesh::Mesh& mesh,
     const std::function<void(T*, const T*, const T*, const double*, const int*,
                              const std::uint8_t*, const std::uint32_t)>& kernel,
     const std::vector<std::int32_t>& active_facets,
@@ -325,7 +325,7 @@ void _lift_bc_exterior_facets(
 //----------------------------------------------------------------------------
 template <typename T>
 void _lift_bc_interior_facets(
-    xtl::span<T> b, const mesh::Mesh& mesh,
+    const xtl::span<T>& b, const mesh::Mesh& mesh,
     const std::function<void(T*, const T*, const T*, const double*, const int*,
                              const std::uint8_t*, const std::uint32_t)>& kernel,
     const std::vector<std::int32_t>& active_facets,
@@ -525,7 +525,7 @@ void _lift_bc_interior_facets(
 }
 //-----------------------------------------------------------------------------
 template <typename T>
-void assemble_vector(xtl::span<T> b, const Form<T>& L)
+void assemble_vector(const xtl::span<T>& b, const Form<T>& L)
 {
   std::shared_ptr<const mesh::Mesh> mesh = L.mesh();
   assert(mesh);
@@ -598,7 +598,7 @@ void assemble_vector(xtl::span<T> b, const Form<T>& L)
 //-----------------------------------------------------------------------------
 template <typename T>
 void assemble_cells(
-    xtl::span<T> b, const mesh::Geometry& geometry,
+    const xtl::span<T>& b, const mesh::Geometry& geometry,
     const std::vector<std::int32_t>& active_cells,
     const graph::AdjacencyList<std::int32_t>& dofmap, const int bs,
     const std::function<void(T*, const T*, const T*, const double*, const int*,
@@ -647,7 +647,7 @@ void assemble_cells(
 //-----------------------------------------------------------------------------
 template <typename T>
 void assemble_exterior_facets(
-    xtl::span<T> b, const mesh::Mesh& mesh,
+    const xtl::span<T>& b, const mesh::Mesh& mesh,
     const std::vector<std::int32_t>& active_facets,
     const graph::AdjacencyList<std::int32_t>& dofmap, const int bs,
     const std::function<void(T*, const T*, const T*, const double*, const int*,
@@ -712,7 +712,7 @@ void assemble_exterior_facets(
 //-----------------------------------------------------------------------------
 template <typename T>
 void assemble_interior_facets(
-    xtl::span<T> b, const mesh::Mesh& mesh,
+    const xtl::span<T>& b, const mesh::Mesh& mesh,
     const std::vector<std::int32_t>& active_facets, const fem::DofMap& dofmap,
     const std::function<void(T*, const T*, const T*, const double*, const int*,
                              const std::uint8_t*, const std::uint32_t)>& fn,
@@ -815,7 +815,7 @@ void assemble_interior_facets(
 //-----------------------------------------------------------------------------
 template <typename T>
 void apply_lifting(
-    xtl::span<T> b, const std::vector<std::shared_ptr<const Form<T>>> a,
+    const xtl::span<T>& b, const std::vector<std::shared_ptr<const Form<T>>> a,
     const std::vector<std::vector<std::shared_ptr<const DirichletBC<T>>>>& bcs1,
     const std::vector<xtl::span<const T>>& x0, double scale)
 {
@@ -864,7 +864,7 @@ void apply_lifting(
 }
 //-----------------------------------------------------------------------------
 template <typename T>
-void lift_bc(xtl::span<T> b, const Form<T>& a,
+void lift_bc(const xtl::span<T>& b, const Form<T>& a,
              const xtl::span<const T>& bc_values1,
              const std::vector<bool>& bc_markers1, const xtl::span<const T>& x0,
              double scale)

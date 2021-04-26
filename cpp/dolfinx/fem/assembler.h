@@ -42,7 +42,7 @@ T assemble_scalar(const Form<T>& M)
 /// before assembly.
 /// @param[in] L The linear forms to assemble into b
 template <typename T>
-void assemble_vector(xtl::span<T> b, const Form<T>& L)
+void assemble_vector(const xtl::span<T>& b, const Form<T>& L)
 {
   fem::impl::assemble_vector(b, L);
 }
@@ -67,7 +67,7 @@ void assemble_vector(xtl::span<T> b, const Form<T>& L)
 /// is responsible for calling VecGhostUpdateBegin/End.
 template <typename T>
 void apply_lifting(
-    xtl::span<T> b, const std::vector<std::shared_ptr<const Form<T>>>& a,
+    const xtl::span<T>& b, const std::vector<std::shared_ptr<const Form<T>>>& a,
     const std::vector<std::vector<std::shared_ptr<const DirichletBC<T>>>>& bcs1,
     const std::vector<xtl::span<const T>>& x0, double scale)
 {
@@ -211,7 +211,7 @@ void set_diagonal(
 /// 'scale'. The vectors b and x0 must have the same local size. The bcs
 /// should be on (sub-)spaces of the form L that b represents.
 template <typename T>
-void set_bc(xtl::span<T> b,
+void set_bc(const xtl::span<T>& b,
             const std::vector<std::shared_ptr<const DirichletBC<T>>>& bcs,
             const xtl::span<const T>& x0, double scale = 1.0)
 {
@@ -228,7 +228,7 @@ void set_bc(xtl::span<T> b,
 /// 'scale'. The bcs should be on (sub-)spaces of the form L that b
 /// represents.
 template <typename T>
-void set_bc(xtl::span<T> b,
+void set_bc(const xtl::span<T>& b,
             const std::vector<std::shared_ptr<const DirichletBC<T>>>& bcs,
             double scale = 1.0)
 {

@@ -159,7 +159,7 @@ public:
   /// the expression. The call must allocate the space. Is has
   template <typename T>
   constexpr void interpolate(const xt::xtensor<T, 2>& values,
-                             xtl::span<T> dofs) const
+                             const xtl::span<T>& dofs) const
   {
     if (!_element)
     {
@@ -196,7 +196,7 @@ public:
   /// @param[in] cell_permutation Permutation data for the cell
   /// @param[in] block_size The block_size of the input data
   template <typename T>
-  void apply_dof_transformation(xtl::span<T> data,
+  void apply_dof_transformation(const xtl::span<T>& data,
                                 std::uint32_t cell_permutation,
                                 int block_size) const
   {
@@ -210,8 +210,10 @@ public:
   /// @param[in] cell_permutation Permutation data for the cell
   /// @param[in] block_size The block_size of the input data
   template <typename T>
-  void apply_inverse_transpose_dof_transformation(
-      xtl::span<T> data, std::uint32_t cell_permutation, int block_size) const
+  void
+  apply_inverse_transpose_dof_transformation(const xtl::span<T>& data,
+                                             std::uint32_t cell_permutation,
+                                             int block_size) const
   {
     assert(_element);
     _element->apply_inverse_transpose_dof_transformation(data, block_size,

@@ -256,7 +256,7 @@ public:
   /// of the array @p x should be equal to the number of dofs owned by
   /// this rank.
   /// @param[in] scale The scaling value to apply
-  void set(xtl::span<T> x, double scale = 1.0) const
+  void set(const xtl::span<T>& x, double scale = 1.0) const
   {
     assert(_g);
     const std::vector<T>& g = _g->x()->array();
@@ -274,7 +274,7 @@ public:
   /// @param[in] x The array in which to set `scale * (x0 - x_bc)`
   /// @param[in] x0 The array used in compute the value to set
   /// @param[in] scale The scaling value to apply
-  void set(xtl::span<T> x, const xtl::span<const T>& x0,
+  void set(const xtl::span<T>& x, const xtl::span<const T>& x0,
            double scale = 1.0) const
   {
     assert(_g);
@@ -298,7 +298,7 @@ public:
   /// @param[in,out] values The array in which to set the dof values.
   /// The array must be at least as long as the array associated with V1
   /// (the space of the function that provides the dof values)
-  void dof_values(xtl::span<T> values) const
+  void dof_values(const xtl::span<T>& values) const
   {
     assert(_g);
     const std::vector<T>& g = _g->x()->array();

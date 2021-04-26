@@ -233,10 +233,12 @@ public:
   /// can be passed, and the corresponding point will be ignored.
   /// @param[in,out] u The values at the points. Values are not computed
   /// for points with a negative cell index. This argument must be
-  /// passed with the correct size.
+  /// passed with the correct size, which is (num_cells, value_size).
+  template <typename U,
+            typename
+            = std::enable_if_t<std::is_same_v<typename U::value_type, T>>>
   void eval(const xt::xtensor<double, 2>& x,
-            const xtl::span<const std::int32_t>& cells,
-            xt::xtensor<T, 2>& u) const
+            const xtl::span<const std::int32_t>& cells, U& u) const
   {
     // TODO: This could be easily made more efficient by exploiting points
     // being ordered by the cell to which they belong.

@@ -173,7 +173,7 @@ void fem(py::module& m)
       .def("value_dimension", &dolfinx::fem::FiniteElement::value_dimension)
       .def("apply_dof_transformation",
            [](const dolfinx::fem::FiniteElement& self,
-              py::array_t<double, py::array::c_style>& x,
+              py::array_t<double, py::array::c_style> x,
               std::uint32_t cell_permutation, int dim) {
              self.apply_dof_transformation(
                  xtl::span(x.mutable_data(), x.size()), cell_permutation, dim);
@@ -616,24 +616,11 @@ void fem(py::module& m)
       .def(
           "eval",
           [](const dolfinx::fem::Function<PetscScalar>& self,
-             const py::array_t<double, py::array::c_style>& x,
-             const py::array_t<std::int32_t, py::array::c_style>& cells,
-             py::array_t<PetscScalar, py::array::c_style>& u) {
+             const xt::pytensor<double, 2>& x,
+             const xt::pytensor<std::int32_t, 1>& cells,
+             xt::pytensor<PetscScalar, 2> u) {
             // TODO: handle 1d case
-
-            std::array<std::size_t, 2> shape_x
-                = {static_cast<std::size_t>(x.shape(0)),
-                   static_cast<std::size_t>(x.shape(1))};
-            auto _x
-                = xt::adapt(x.data(), x.size(), xt::no_ownership(), shape_x);
-
-            std::array<std::size_t, 2> shape_u
-                = {static_cast<std::size_t>(u.shape(0)),
-                   static_cast<std::size_t>(u.shape(1))};
-            xt::xtensor<PetscScalar, 2> _u = xt::adapt(
-                u.mutable_data(), u.size(), xt::no_ownership(), shape_u);
-            self.eval(_x, xtl::span(cells.data(), cells.size()), _u);
-            std::copy_n(_u.data(), _u.size(), u.mutable_data());
+            self.eval(x, xtl::span(cells), u);
           },
           py::arg("x"), py::arg("cells"), py::arg("values"),
           "Evaluate Function")
