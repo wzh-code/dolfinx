@@ -2,16 +2,29 @@ cmake_minimum_required(VERSION 3.10)
 
 PROJECT(dolfinx_pybind11)
 
-find_package(xtensor REQUIRED)
 find_package(Basix REQUIRED)
 find_package(DOLFINX REQUIRED)
 
-# Check if the Basix C++ library was compiled with xtensor SIMD
-get_target_property(BASIX_DEFN Basix::basix INTERFACE_COMPILE_DEFINITIONS)
-get_target_property(DOLFINX_DEFN dolfinx INTERFACE_COMPILE_DEFINITIONS)
-if("XTENSOR_USE_XSIMD" IN_LIST BASIX_DEFN OR "XTENSOR_USE_XSIMD" IN_LIST DOLFINX_DEFN)
-  find_package(xsimd REQUIRED)
+# Find dependecies
+set(XTENSOR_PYTHON_MIN_VERSION 0.25.1)
+if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.19)
+  find_package(xtensor-python ${XTENSOR_PYTHON_MIN_VERSION}...<0.26 QUIET)
+else()
+  find_package(xtensor-python ${XTENSOR_PYTHON_MIN_VERSION} QUIET)
 endif()
+if(NOT xtensor-python_FOUND)
+  include(FetchContent)
+  message("downloading xtensor-python source...")
+  FetchContent_Declare(
+    xtensor-python
+    GIT_REPOSITORY https://github.com/xtensor-stack/xtensor-python.git
+    GIT_TAG        0.25.1
+  )
+  FetchContent_MakeAvailable(xtensor-python)
+else()
+  message("found xtensor-python ${xtensor-python_VERSION}")
+endif()
+
 
 # Set C++ standard before finding pybind11
 set(CMAKE_CXX_STANDARD 17)
@@ -50,12 +63,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 endif()
 
 # Add DOLFINX libraries and other config
-target_link_libraries(cpp PRIVATE pybind11::module dolfinx)
-
-# Add xsimd if the Basix C++ interface was compiled with it
-if("XTENSOR_USE_XSIMD" IN_LIST BASIX_DEFN OR "XTENSOR_USE_XSIMD" IN_LIST DOLFINX_DEFN)
-  target_link_libraries(cpp PRIVATE xsimd)
-endif()
+target_link_libraries(cpp PRIVATE pybind11::module dolfinx xtensor-python)
 
 # Add to CMake search path
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
