@@ -11,6 +11,10 @@
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 
+// #define PY_ARRAY_UNIQUE_SYMBOL my_uniqe_array_api
+// #include <xtensor-python/pyarray.hpp>
+// #include <xtensor-python/pytensor.hpp>
+
 namespace py = pybind11;
 
 namespace dolfinx_wrappers
@@ -27,9 +31,9 @@ inline py::array_t<typename Sequence::value_type> as_pyarray(Sequence&& seq)
   auto data = seq.data();
   std::unique_ptr<Sequence> seq_ptr
       = std::make_unique<Sequence>(std::move(seq));
-  auto capsule = py::capsule(seq_ptr.get(), [](void* p) {
-    std::unique_ptr<Sequence>(reinterpret_cast<Sequence*>(p));
-  });
+  auto capsule = py::capsule(
+      seq_ptr.get(), [](void* p)
+      { std::unique_ptr<Sequence>(reinterpret_cast<Sequence*>(p)); });
   seq_ptr.release();
   return py::array(size, data, capsule);
 }
@@ -46,10 +50,12 @@ inline py::array_t<T> as_pyarray2d(dolfinx::array2d<T>&& array)
   auto data = array.data();
   std::unique_ptr<dolfinx::array2d<T>> array_ptr
       = std::make_unique<dolfinx::array2d<T>>(std::move(array));
-  auto capsule = py::capsule(array_ptr.get(), [](void* p) {
-    std::unique_ptr<dolfinx::array2d<T>>(
-        reinterpret_cast<dolfinx::array2d<T>*>(p));
-  });
+  auto capsule = py::capsule(array_ptr.get(),
+                             [](void* p)
+                             {
+                               std::unique_ptr<dolfinx::array2d<T>>(
+                                   reinterpret_cast<dolfinx::array2d<T>*>(p));
+                             });
   array_ptr.release();
   return py::array(shape, strides, data, capsule);
 }
@@ -67,9 +73,8 @@ auto xt_as_pyarray(U&& x)
   std::transform(strides.begin(), strides.end(), strides.begin(),
                  [](auto s) { return s * sizeof(typename U::value_type); });
   std::unique_ptr<U> x_ptr = std::make_unique<U>(std::move(x));
-  auto capsule = py::capsule(x_ptr.get(), [](void* p) {
-    std::unique_ptr<U>(reinterpret_cast<U*>(p));
-  });
+  auto capsule = py::capsule(x_ptr.get(), [](void* p)
+                             { std::unique_ptr<U>(reinterpret_cast<U*>(p)); });
   x_ptr.release();
 
   return py::array_t<typename U::value_type>(shape, strides, data, capsule);

@@ -4,7 +4,6 @@
 //
 // SPDX-License-Identifier:    LGPL-3.0-or-later
 
-#include "array.h"
 #include "caster_mpi.h"
 #include "caster_petsc.h"
 #include <array>
@@ -47,7 +46,9 @@
 #include <xtensor/xtensor.hpp>
 #include <xtensor/xview.hpp>
 
-#define FORCE_IMPORT_ARRAY
+#include "array.h"
+
+#define PY_ARRAY_UNIQUE_SYMBOL my_uniqe_array_api
 #include <xtensor-python/pyarray.hpp>
 #include <xtensor-python/pytensor.hpp>
 

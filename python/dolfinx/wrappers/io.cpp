@@ -4,7 +4,6 @@
 //
 // SPDX-License-Identifier:    LGPL-3.0-or-later
 
-#include "array.h"
 #include "caster_mpi.h"
 #include "caster_petsc.h"
 #include <dolfinx/common/array2d.h>
@@ -25,13 +24,20 @@
 #include <vector>
 #include <xtensor/xadapt.hpp>
 
+#include "array.h"
+
+#define FORCE_IMPORT_ARRAY
+#define PY_ARRAY_UNIQUE_SYMBOL my_uniqe_array_api
+#include <xtensor-python/pyarray.hpp>
+#include <xtensor-python/pytensor.hpp>
+
 namespace py = pybind11;
 
 namespace dolfinx_wrappers
 {
-
 void io(py::module& m)
 {
+  xt::import_numpy();
 
   // dolfinx::io::cell vtk cell type converter
   m.def("get_vtk_cell_type", &dolfinx::io::cells::get_vtk_cell_type);
@@ -43,17 +49,13 @@ void io(py::module& m)
   // TODO: Template for different values dtypes
   m.def("extract_local_entities",
         [](const dolfinx::mesh::Mesh& mesh, int entity_dim,
-           const py::array_t<std::int64_t, py::array::c_style>& entities,
-           const py::array_t<std::int32_t, py::array::c_style>& values) {
-          assert(entities.ndim() == 2);
-          std::array<std::size_t, 2> shape
-              = {static_cast<std::size_t>(entities.shape(0)),
-                 static_cast<std::size_t>(entities.shape(1))};
-          auto _entities = xt::adapt(entities.data(), entities.size(),
-                                     xt::no_ownership(), shape);
+           xt::pytensor<std::int64_t, 2>& entities,
+           const py::array_t<std::int32_t, py::array::c_style>& values)
+        {
+          assert(values.ndim() == 1);
           std::pair<xt::xtensor<std::int32_t, 2>, std::vector<std::int32_t>> e
               = dolfinx::io::xdmf_utils::extract_local_entities(
-                  mesh, entity_dim, _entities,
+                  mesh, entity_dim, entities,
                   xtl::span(values.data(), values.size()));
           return std::pair(xt_as_pyarray(std::move(e.first)),
                            as_pyarray(std::move(e.second)));
@@ -69,12 +71,14 @@ void io(py::module& m)
       .value("ASCII", dolfinx::io::XDMFFile::Encoding::ASCII);
 
   xdmf_file
-      .def(py::init([](const MPICommWrapper comm, const std::string filename,
-                       const std::string file_mode,
-                       dolfinx::io::XDMFFile::Encoding encoding) {
-             return std::make_unique<dolfinx::io::XDMFFile>(
-                 comm.get(), filename, file_mode, encoding);
-           }),
+      .def(py::init(
+               [](const MPICommWrapper comm, const std::string filename,
+                  const std::string file_mode,
+                  dolfinx::io::XDMFFile::Encoding encoding)
+               {
+                 return std::make_unique<dolfinx::io::XDMFFile>(
+                     comm.get(), filename, file_mode, encoding);
+               }),
            py::arg("comm"), py::arg("filename"), py::arg("file_mode"),
            py::arg("encoding") = dolfinx::io::XDMFFile::Encoding::HDF5)
       .def("__enter__",
@@ -91,16 +95,14 @@ void io(py::module& m)
       .def(
           "read_topology_data",
           [](dolfinx::io::XDMFFile& self, const std::string& name,
-             const std::string& xpath) {
-            return xt_as_pyarray(self.read_topology_data(name, xpath));
-          },
+             const std::string& xpath)
+          { return xt_as_pyarray(self.read_topology_data(name, xpath)); },
           py::arg("name") = "mesh", py::arg("xpath") = "/Xdmf/Domain")
       .def(
           "read_geometry_data",
           [](dolfinx::io::XDMFFile& self, const std::string& name,
-             const std::string& xpath) {
-            return xt_as_pyarray(self.read_geometry_data(name, xpath));
-          },
+             const std::string& xpath)
+          { return xt_as_pyarray(self.read_geometry_data(name, xpath)); },
           py::arg("name") = "mesh", py::arg("xpath") = "/Xdmf/Domain")
       .def("read_geometry_data", &dolfinx::io::XDMFFile::read_geometry_data,
            py::arg("name") = "mesh", py::arg("xpath") = "/Xdmf/Domain")
@@ -127,18 +129,17 @@ void io(py::module& m)
            py::arg("name"), py::arg("value"), py::arg("xpath") = "/Xdmf/Domain")
       .def("read_information", &dolfinx::io::XDMFFile::read_information,
            py::arg("name"), py::arg("xpath") = "/Xdmf/Domain")
-      .def("comm", [](dolfinx::io::XDMFFile& self) {
-        return MPICommWrapper(self.comm());
-      });
+      .def("comm", [](dolfinx::io::XDMFFile& self)
+           { return MPICommWrapper(self.comm()); });
 
   // dolfinx::io::VTKFile
   py::class_<dolfinx::io::VTKFile, std::shared_ptr<dolfinx::io::VTKFile>>
       vtk_file(m, "VTKFile");
 
   vtk_file
-      .def(py::init([](std::string filename) {
-             return std::make_unique<dolfinx::io::VTKFile>(filename);
-           }),
+      .def(py::init(
+               [](std::string filename)
+               { return std::make_unique<dolfinx::io::VTKFile>(filename); }),
            py::arg("filename"))
       .def("write",
            py::overload_cast<const dolfinx::fem::Function<double>&>(
