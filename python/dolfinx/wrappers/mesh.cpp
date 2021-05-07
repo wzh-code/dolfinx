@@ -88,6 +88,7 @@ void declare_meshtags(py::module& m, std::string type)
 
 void mesh(py::module& m)
 {
+  xt::import_numpy();
 
   py::enum_<dolfinx::mesh::CellType>(m, "CellType")
       .value("point", dolfinx::mesh::CellType::point)

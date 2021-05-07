@@ -7,11 +7,6 @@
 #include <iostream>
 #include <pybind11/pybind11.h>
 
-#define FORCE_IMPORT_ARRAY
-#define PY_ARRAY_UNIQUE_SYMBOL my_uniqe_array_api
-#include <xtensor-python/pyarray.hpp>
-#include <xtensor-python/pytensor.hpp>
-
 namespace py = pybind11;
 
 namespace dolfinx_wrappers
@@ -33,8 +28,6 @@ void refinement(py::module& m);
 
 PYBIND11_MODULE(cpp, m)
 {
-  xt::import_numpy();
-
   // Create module for C++ wrappers
   m.doc() = "DOLFINx Python interface";
   m.attr("__version__") = DOLFINX_VERSION;
