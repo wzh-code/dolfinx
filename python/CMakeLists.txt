@@ -11,8 +11,6 @@ if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.19)
   find_package(xtensor-python ${XTENSOR_PYTHON_MIN_VERSION}...<0.26 QUIET)
 else()
   find_package(xtensor-python ${XTENSOR_PYTHON_MIN_VERSION} QUIET)
-<<<<<<< HEAD
-=======
 endif()
 if(NOT xtensor-python_FOUND)
   include(FetchContent)
@@ -25,7 +23,6 @@ if(NOT xtensor-python_FOUND)
   FetchContent_MakeAvailable(xtensor-python)
 else()
   message("found xtensor-python ${xtensor-python_VERSION}")
->>>>>>> garth/xtensor-pybind11-2
 endif()
 if(NOT xtensor-python_FOUND)
   include(FetchContent)
