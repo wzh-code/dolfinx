@@ -1,6 +1,6 @@
 // Copyright (C) 2017 Chris N. Richardson and Garth N. Wells
 //
-// This file is part of DOLFINX (https://www.fenicsproject.org)
+// This file is part of DOLFINx (https://www.fenicsproject.org)
 //
 // SPDX-License-Identifier:    LGPL-3.0-or-later
 
@@ -21,7 +21,7 @@
 
 #include "array.h"
 
-// #define FORCE_IMPORT_ARRAY
+#define FORCE_IMPORT_ARRAY
 #define PY_ARRAY_UNIQUE_SYMBOL my_uniqe_array_api
 #include <xtensor-python/pyarray.hpp>
 #include <xtensor-python/pytensor.hpp>

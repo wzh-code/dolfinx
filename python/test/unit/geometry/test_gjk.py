@@ -1,6 +1,6 @@
 # Copyright (C) 2020 Jørgen S. Dokken and Chris N. Richardson
 #
-# This file is part of DOLFINX (https://www.fenicsproject.org)
+# This file is part of DOLFINx (https://www.fenicsproject.org)
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
@@ -31,7 +31,7 @@ def test_line_point_distance(delta):
     line = np.array([[0.1, 0.2, 0.3], [0.5, 0.8, 0.7]], dtype=np.float64)
     point_on_line = [line[0] + 0.27 * (line[1] - line[0])]
     normal = np.cross(line[0], line[1])
-    point = point_on_line + delta * normal
+    point = [point_on_line + delta * normal]
     distance = np.linalg.norm(compute_distance_gjk(line, point))
     actual_distance = distance_point_to_line_3D(line[0], line[1], point)
     assert np.isclose(distance, actual_distance, atol=1e-15)
