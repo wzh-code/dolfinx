@@ -11,10 +11,6 @@
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 
-// #define PY_ARRAY_UNIQUE_SYMBOL my_uniqe_array_api
-// #include <xtensor-python/pyarray.hpp>
-// #include <xtensor-python/pytensor.hpp>
-
 namespace py = pybind11;
 
 namespace dolfinx_wrappers
