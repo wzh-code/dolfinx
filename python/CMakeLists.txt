@@ -62,7 +62,7 @@ target_link_libraries(cpp PRIVATE pybind11::headers dolfinx xtensor-python)
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
   set_target_properties(cpp PROPERTIES INTERPROCEDURAL_OPTIMIZATION OFF
                                        CXX_VISIBILITY_PRESET default
-                                       VISIBLITY_INLINES_HIDDEN ON)
+                                       VISIBLITY_INLINES_HIDDEN OFF)
 else()
   set_target_properties(cpp PROPERTIES INTERPROCEDURAL_OPTIMIZATION ON
                                        CXX_VISIBILITY_PRESET hidden
