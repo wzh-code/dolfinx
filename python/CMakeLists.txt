@@ -59,6 +59,12 @@ endif()
 
 # Add DOLFINX libraries and other config
 target_link_libraries(cpp PRIVATE pybind11::headers dolfinx xtensor-python)
+
+# Add xsimd if the Basix C++ interface was compiled with it
+if("XTENSOR_USE_XSIMD" IN_LIST BASIX_DEFN OR "XTENSOR_USE_XSIMD" IN_LIST DOLFINX_DEFN)
+  target_link_libraries(cpp PRIVATE xsimd)
+endif()
+
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
   set_target_properties(cpp PROPERTIES INTERPROCEDURAL_OPTIMIZATION OFF
                                        CXX_VISIBILITY_PRESET default
