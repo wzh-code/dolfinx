@@ -19,9 +19,6 @@
 #include <xtensor/xtensor.hpp>
 #include <xtl/xspan.hpp>
 
-#include "array.h"
-
-#define FORCE_IMPORT_ARRAY
 #define PY_ARRAY_UNIQUE_SYMBOL my_uniqe_array_api
 #include <xtensor-python/pyarray.hpp>
 #include <xtensor-python/pytensor.hpp>

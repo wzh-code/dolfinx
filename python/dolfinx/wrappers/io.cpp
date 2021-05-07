@@ -4,6 +4,7 @@
 //
 // SPDX-License-Identifier:    LGPL-3.0-or-later
 
+#include "array.h"
 #include "caster_mpi.h"
 #include "caster_petsc.h"
 #include <dolfinx/common/array2d.h>
@@ -24,9 +25,6 @@
 #include <vector>
 #include <xtensor/xadapt.hpp>
 
-#include "array.h"
-
-#define FORCE_IMPORT_ARRAY
 #define PY_ARRAY_UNIQUE_SYMBOL my_uniqe_array_api
 #include <xtensor-python/pyarray.hpp>
 #include <xtensor-python/pytensor.hpp>
