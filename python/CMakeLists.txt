@@ -80,7 +80,7 @@ endif()
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
   set_target_properties(cpp PROPERTIES INTERPROCEDURAL_OPTIMIZATION OFF
-                                       CXX_VISIBILITY_PRESET default
+                                       CXX_VISIBILITY_PRESET hidden
                                        VISIBLITY_INLINES_HIDDEN OFF)
 else()
   set_target_properties(cpp PROPERTIES INTERPROCEDURAL_OPTIMIZATION ON
