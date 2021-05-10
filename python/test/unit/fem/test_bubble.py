@@ -35,10 +35,9 @@ W = dolfinx.FunctionSpace(mesh, ufl.MixedElement([V, Q]))
 W0 = W.sub(0).collapse()
 
 # No slip boundary condition
-noslip = dolfinx.Function(V)
 facets = dolfinx.mesh.locate_entities_boundary(mesh, 1, noslip_boundary)
-dofs = dolfinx.fem.locate_dofs_topological((W.sub(0), V), 1, facets)
-bc0 = dolfinx.DirichletBC(noslip, dofs, W.sub(0))
+dofs = dolfinx.fem.locate_dofs_topological(W.sub(0), 1, facets)
+bc0 = dolfinx.DirichletBC(dolfinx.Function(W), dofs)
 
 
 # Driving velocity condition u = (1, 0) on top boundary (y = 1)
