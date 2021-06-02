@@ -714,10 +714,13 @@ void fem(py::module& m)
                }),
            py::arg("coefficients"), py::arg("constants"), py::arg("mesh"),
            py::arg("x"), py::arg("fn"), py::arg("value_size"))
-      .def("eval", [](const dolfinx::fem::Expression<PetscScalar>& self,
-                      const xt::pytensor<std::int32_t, 1>& active_cells,
-                      xt::pytensor<PetscScalar, 2>& values)
-           { self.eval(active_cells, values); })
+      .def("eval",
+           [](const dolfinx::fem::Expression<PetscScalar>& self,
+              const py::array_t<std::int32_t, py::array::c_style>& active_cells,
+              xt::pytensor<PetscScalar, 2>& values) {
+             self.eval(tcb::span(active_cells.data(), active_cells.size()),
+                       values);
+           })
       .def_property_readonly("mesh",
                              &dolfinx::fem::Expression<PetscScalar>::mesh,
                              py::return_value_policy::reference_internal)

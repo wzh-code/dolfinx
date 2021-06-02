@@ -33,8 +33,8 @@ void eval(T& values, const fem::Expression<typename T::value_type>& e,
   assert(mesh);
 
   // Prepare coefficients and constants
-  const array2d<T> coeffs = pack_coefficients(e);
-  const std::vector<T> constant_values = pack_constants(e);
+  const array2d<typename T::value_type> coeffs = pack_coefficients(e);
+  const std::vector<typename T::value_type> constant_values = pack_constants(e);
 
   const auto& fn = e.get_tabulate_expression();
 
