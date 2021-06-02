@@ -166,8 +166,21 @@ void fem(py::module& m)
             return dolfinx::fem::FiniteElement(*p);
           }))
       .def("num_sub_elements", &dolfinx::fem::FiniteElement::num_sub_elements)
+<<<<<<< HEAD
       .def_property_readonly("interpolation_points",
                              &dolfinx::fem::FiniteElement::interpolation_points)
+=======
+      .def("interpolation_points",
+           [](const dolfinx::fem::FiniteElement& self)
+           {
+             const xt::xtensor<double, 2>& x = self.interpolation_points();
+
+             // FIXME: Set read-only flag and return wrapper
+             return py::array_t<double>(x.shape(), x.data());
+             //  return py::array_t<double>(x.shape(), x.data(),
+             //  py::cast(self));
+           })
+>>>>>>> origin/main
       .def_property_readonly("interpolation_ident",
                              &dolfinx::fem::FiniteElement::interpolation_ident)
       .def_property_readonly("value_rank",
@@ -176,7 +189,11 @@ void fem(py::module& m)
       .def("value_dimension", &dolfinx::fem::FiniteElement::value_dimension)
       .def("apply_dof_transformation",
            [](const dolfinx::fem::FiniteElement& self,
+<<<<<<< HEAD
               py::array_t<double, py::array::c_style> x,
+=======
+              py::array_t<double, py::array::c_style>& x,
+>>>>>>> origin/main
               std::uint32_t cell_permutation, int dim)
            {
              self.apply_dof_transformation(
@@ -236,9 +253,25 @@ void fem(py::module& m)
                              &dolfinx::fem::CoordinateElement::dof_layout)
       .def("push_forward",
            [](const dolfinx::fem::CoordinateElement& self,
+<<<<<<< HEAD
               const xt::pytensor<double, 2>& X,
               const xt::pytensor<double, 2>& cell_geometry)
            {
+=======
+              const py::array_t<double, py::array::c_style>& X,
+              const py::array_t<double, py::array::c_style>& cell_geometry)
+           {
+             std::array<std::size_t, 2> s_x
+                 = {static_cast<std::size_t>(X.shape(0)),
+                    static_cast<std::size_t>(X.shape(1))};
+             auto _X = xt::adapt(X.data(), X.size(), xt::no_ownership(), s_x);
+             std::array<std::size_t, 2> s_g
+                 = {static_cast<std::size_t>(cell_geometry.shape(0)),
+                    static_cast<std::size_t>(cell_geometry.shape(1))};
+             auto g = xt::adapt(cell_geometry.data(), cell_geometry.size(),
+                                xt::no_ownership(), s_g);
+
+>>>>>>> origin/main
              xt::xtensor<double, 2> x = xt::empty<double>(
                  {X.shape(0), std::size_t(cell_geometry.shape(1))});
              const xt::xtensor<double, 2> phi
@@ -271,7 +304,12 @@ void fem(py::module& m)
       .def(py::init(
           [](const std::shared_ptr<const dolfinx::fem::Function<PetscScalar>>&
                  g,
+<<<<<<< HEAD
              const std::array<xt::pytensor<std::int32_t, 1>, 2>& V_g_dofs,
+=======
+             const std::array<py::array_t<std::int32_t, py::array::c_style>, 2>&
+                 V_g_dofs,
+>>>>>>> origin/main
              const std::shared_ptr<const dolfinx::fem::FunctionSpace>& V)
           {
             std::array dofs = {std::vector<std::int32_t>(
@@ -297,8 +335,11 @@ void fem(py::module& m)
                              &dolfinx::fem::DirichletBC<PetscScalar>::value);
 
   // dolfinx::fem::assemble
+
   // Functional
-  m.def("assemble_scalar", &dolfinx::fem::assemble_scalar<PetscScalar>,
+  m.def("assemble_scalar",
+        py::overload_cast<const dolfinx::fem::Form<PetscScalar>&>(
+            &dolfinx::fem::assemble_scalar<PetscScalar>),
         "Assemble functional over mesh");
   // Vector
   m.def(
@@ -547,6 +588,7 @@ void fem(py::module& m)
       "locate_dofs_geometrical",
       [](const std::vector<
              std::reference_wrapper<const dolfinx::fem::FunctionSpace>>& V,
+<<<<<<< HEAD
          const std::function<xt::pytensor<bool, 1>(
              const xt::pytensor<double, 2>&)>& marker)
           -> std::array<py::array_t<std::int32_t>, 2>
@@ -555,6 +597,26 @@ void fem(py::module& m)
           throw std::runtime_error("Expected two function spaces.");
         auto _marker = [&marker](const xt::xtensor<double, 2>& x)
             -> xt::pytensor<bool, 1> { return marker(x); };
+=======
+         const std::function<py::array_t<bool>(const py::array_t<double>&)>&
+             marker) -> std::array<py::array, 2>
+      {
+        if (V.size() != 2)
+          throw std::runtime_error("Expected two function spaces.");
+
+        auto _marker
+            = [&marker](const xt::xtensor<double, 2>& x) -> xt::xtensor<bool, 1>
+        {
+          auto strides = x.strides();
+          std::transform(strides.begin(), strides.end(), strides.begin(),
+                         [](auto s) { return s * sizeof(double); });
+          py::array_t _x(x.shape(), strides, x.data(), py::none());
+          py::array_t m = marker(_x);
+          std::vector<std::size_t> s(m.shape(), m.shape() + m.ndim());
+          return xt::adapt(m.data(), m.size(), xt::no_ownership(), s);
+        };
+
+>>>>>>> origin/main
         std::array<std::vector<std::int32_t>, 2> dofs
             = dolfinx::fem::locate_dofs_geometrical({V[0], V[1]}, _marker);
         return {as_pyarray(std::move(dofs[0])), as_pyarray(std::move(dofs[1]))};
@@ -563,11 +625,28 @@ void fem(py::module& m)
   m.def(
       "locate_dofs_geometrical",
       [](const dolfinx::fem::FunctionSpace& V,
+<<<<<<< HEAD
          const std::function<xt::pytensor<bool, 1>(
              const xt::pytensor<double, 2>&)>& marker)
       {
         auto _marker = [&marker](const xt::xtensor<double, 2>& x)
             -> xt::pytensor<bool, 1> { return marker(x); };
+=======
+         const std::function<py::array_t<bool>(const py::array_t<double>&)>&
+             marker)
+      {
+        auto _marker
+            = [&marker](const xt::xtensor<double, 2>& x) -> xt::xtensor<bool, 1>
+        {
+          auto strides = x.strides();
+          std::transform(strides.begin(), strides.end(), strides.begin(),
+                         [](auto s) { return s * sizeof(double); });
+          py::array_t _x(x.shape(), strides, x.data(), py::none());
+          py::array_t m = marker(_x);
+          std::vector<std::size_t> s(m.shape(), m.shape() + m.ndim());
+          return xt::adapt(m.data(), m.size(), xt::no_ownership(), s);
+        };
+>>>>>>> origin/main
         return as_pyarray(dolfinx::fem::locate_dofs_geometrical(V, _marker));
       },
       py::arg("V"), py::arg("marker"));
@@ -589,11 +668,30 @@ void fem(py::module& m)
       .def(
           "interpolate",
           [](dolfinx::fem::Function<PetscScalar>& self,
+<<<<<<< HEAD
              const std::function<xt::pyarray<PetscScalar>(
                  const xt::pytensor<double, 2>&)>& f)
           {
             auto _f = [&f](const xt::xtensor<double, 2>& x)
                 -> xt::xarray<PetscScalar> { return f(x); };
+=======
+             const std::function<py::array_t<PetscScalar>(
+                 const py::array_t<double>&)>& f)
+          {
+            auto _f =
+                [&f](const xt::xtensor<double, 2>& x) -> xt::xarray<PetscScalar>
+            {
+              auto strides = x.strides();
+              std::transform(strides.begin(), strides.end(), strides.begin(),
+                             [](auto s) { return s * sizeof(double); });
+              py::array_t _x(x.shape(), strides, x.data(), py::none());
+              py::array_t v = f(_x);
+              std::vector<std::size_t> shape;
+              for (pybind11::ssize_t i = 0; i < v.ndim(); i++)
+                shape.push_back(v.shape()[i]);
+              return xt::adapt(v.data(), shape);
+            };
+>>>>>>> origin/main
             self.interpolate(_f);
           },
           py::arg("f"), "Interpolate an expression")
@@ -641,18 +739,32 @@ void fem(py::module& m)
       .def(
           "eval",
           [](const dolfinx::fem::Function<PetscScalar>& self,
+<<<<<<< HEAD
              const xt::pytensor<double, 2>& x,
              const xt::pytensor<std::int32_t, 1>& cells,
              xt::pytensor<PetscScalar, 2> u)
+=======
+             const py::array_t<double, py::array::c_style>& x,
+             const py::array_t<std::int32_t, py::array::c_style>& cells,
+             py::array_t<PetscScalar, py::array::c_style>& u)
+>>>>>>> origin/main
           {
             // TODO: handle 1d case
             self.eval(x, xtl::span(cells), u);
           },
           py::arg("x"), py::arg("cells"), py::arg("values"),
           "Evaluate Function")
+<<<<<<< HEAD
       .def("compute_point_values",
            &dolfinx::fem::Function<PetscScalar>::compute_point_values,
            "Compute values at all mesh points")
+=======
+      .def(
+          "compute_point_values",
+          [](const dolfinx::fem::Function<PetscScalar>& self)
+          { return xt_as_pyarray(self.compute_point_values()); },
+          "Compute values at all mesh points")
+>>>>>>> origin/main
       .def_property_readonly(
           "function_space",
           &dolfinx::fem::Function<PetscScalar>::function_space);
@@ -674,8 +786,13 @@ void fem(py::module& m)
       .def_property_readonly("dofmap", &dolfinx::fem::FunctionSpace::dofmap)
       .def("sub", &dolfinx::fem::FunctionSpace::sub)
       .def("tabulate_dof_coordinates",
+<<<<<<< HEAD
            &dolfinx::fem::FunctionSpace::tabulate_dof_coordinates,
            py::arg("transpose") = false);
+=======
+           [](const dolfinx::fem::FunctionSpace& self)
+           { return xt_as_pyarray(self.tabulate_dof_coordinates(false)); });
+>>>>>>> origin/main
 
   // dolfinx::fem::Constant
   py::class_<dolfinx::fem::Constant<PetscScalar>,
@@ -699,8 +816,13 @@ void fem(py::module& m)
                   const std::vector<std::shared_ptr<
                       const dolfinx::fem::Constant<PetscScalar>>>& constants,
                   const std::shared_ptr<const dolfinx::mesh::Mesh>& mesh,
+<<<<<<< HEAD
                   const xt::pytensor<double, 2>& X, py::object addr,
                   const std::size_t value_size)
+=======
+                  const py::array_t<double, py::array::c_style>& X,
+                  py::object addr, const std::size_t value_size)
+>>>>>>> origin/main
                {
                  auto tabulate_expression_ptr = (void (*)(
                      PetscScalar*, const PetscScalar*, const PetscScalar*,
@@ -711,10 +833,31 @@ void fem(py::module& m)
                }),
            py::arg("coefficients"), py::arg("constants"), py::arg("mesh"),
            py::arg("x"), py::arg("fn"), py::arg("value_size"))
+<<<<<<< HEAD
       .def("eval", [](const dolfinx::fem::Expression<PetscScalar>& self,
                       const xt::pytensor<std::int32_t, 1>& active_cells,
                       xt::pytensor<PetscScalar, 2>& values)
            { self.eval(active_cells, values); })
+=======
+      .def("eval",
+           [](const dolfinx::fem::Expression<PetscScalar>& self,
+              const py::array_t<std::int32_t, py::array::c_style>& active_cells,
+              py::array_t<PetscScalar> values)
+           {
+             dolfinx::array2d<PetscScalar> _values(active_cells.shape()[0],
+                                                   self.num_points()
+                                                       * self.value_size());
+             self.eval(xtl::span(active_cells.data(), active_cells.size()),
+                       _values);
+             assert(values.ndim() == 2);
+             assert(values.shape()[0] == (py::ssize_t)_values.shape[0]);
+             assert(values.shape()[1] == (py::ssize_t)_values.shape[1]);
+             auto v = values.mutable_unchecked();
+             for (py::ssize_t i = 0; i < v.shape(0); i++)
+               for (py::ssize_t j = 0; j < v.shape(1); j++)
+                 v(i, j) = _values(i, j);
+           })
+>>>>>>> origin/main
       .def_property_readonly("mesh",
                              &dolfinx::fem::Expression<PetscScalar>::mesh,
                              py::return_value_policy::reference_internal)
