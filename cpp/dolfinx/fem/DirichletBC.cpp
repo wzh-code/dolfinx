@@ -273,6 +273,10 @@ std::array<std::vector<std::int32_t>, 2> fem::locate_dofs_topological(
   mesh->topology_mutable().create_entities(tdim);
   mesh->topology_mutable().create_connectivity(dim, tdim);
 
+  const std::vector<mesh::CellType>& cell_types = mesh->topology().cell_types();
+  if (cell_types.size() > 1)
+    throw std::runtime_error("mixed mesh");
+
   // Allocate space
   // FIXME: check that dof layouts are the same
   assert(dofmap0->element_dof_layout);
@@ -283,8 +287,7 @@ std::array<std::vector<std::int32_t>, 2> fem::locate_dofs_topological(
 
   // Build vector local dofs for each cell facet
   std::vector<std::vector<int>> entity_dofs;
-  for (int i = 0;
-       i < mesh::cell_num_entities(mesh->topology().cell_type(), dim); ++i)
+  for (int i = 0; i < mesh::cell_num_entities(cell_types[0], dim); ++i)
   {
     entity_dofs.push_back(
         dofmap0->element_dof_layout->entity_closure_dofs(dim, i));
@@ -379,6 +382,10 @@ fem::locate_dofs_topological(const fem::FunctionSpace& V, const int dim,
 
   const int tdim = mesh->topology().dim();
 
+  const std::vector<mesh::CellType>& cell_types = mesh->topology().cell_types();
+  if (cell_types.size() > 1)
+    throw std::runtime_error("mixed mesh");
+
   // Initialise entity-cell connectivity
   // FIXME: cleanup these calls? Some of them happen internally again.
   mesh->topology_mutable().create_entities(tdim);
@@ -386,8 +393,7 @@ fem::locate_dofs_topological(const fem::FunctionSpace& V, const int dim,
 
   // Prepare an element - local dof layout for dofs on entities of the
   // entity_dim
-  const int num_cell_entities
-      = mesh::cell_num_entities(mesh->topology().cell_type(), dim);
+  const int num_cell_entities = mesh::cell_num_entities(cell_types[0], dim);
   std::vector<std::vector<int>> entity_dofs;
   for (int i = 0; i < num_cell_entities; ++i)
   {

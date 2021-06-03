@@ -341,11 +341,15 @@ void add_mesh(const mesh::Mesh& mesh, pugi::xml_node& piece_node)
   // Get map from VTK index i to DOLFIN index j
   int num_nodes = geometry.cmap().dof_layout().num_dofs();
 
-  std::vector<std::uint8_t> map = io::cells::transpose(
-      io::cells::perm_vtk(topology.cell_type(), num_nodes));
+  std::vector<mesh::CellType> celltypes = topology.cell_types();
+  if (celltypes.size() > 1)
+    throw std::runtime_error("mixed mesh");
+
+  std::vector<std::uint8_t> map
+      = io::cells::transpose(io::cells::perm_vtk(celltypes[0], num_nodes));
   // TODO: Remove when when paraview issue 19433 is resolved
   // (https://gitlab.kitware.com/paraview/paraview/issues/19433)
-  if (topology.cell_type() == mesh::CellType::hexahedron and num_nodes == 27)
+  if (celltypes[0] == mesh::CellType::hexahedron and num_nodes == 27)
   {
     map = {0,  9, 12, 3,  1, 10, 13, 4,  18, 15, 21, 6,  19, 16,
            22, 7, 2,  11, 5, 14, 8,  17, 20, 23, 24, 25, 26};
@@ -378,7 +382,7 @@ void add_mesh(const mesh::Mesh& mesh, pugi::xml_node& piece_node)
   type_node.append_attribute("type") = "Int8";
   type_node.append_attribute("Name") = "types";
   type_node.append_attribute("format") = "ascii";
-  int celltype = get_vtk_cell_type(topology.cell_type(), tdim);
+  int celltype = get_vtk_cell_type(celltypes[0], tdim);
   std::stringstream s;
   for (std::int32_t c = 0; c < num_cells; ++c)
     s << celltype << " ";

@@ -575,9 +575,12 @@ std::tuple<graph::AdjacencyList<std::int64_t>, xt::xtensor<double, 2>,
            std::vector<std::int32_t>>
 plaza::compute_refinement_data(const mesh::Mesh& mesh)
 {
+  const std::vector<mesh::CellType>& cell_types = mesh.topology().cell_types();
+  if (cell_types.size() > 1)
+    throw std::runtime_error("mixed mesh");
 
-  if (mesh.topology().cell_type() != mesh::CellType::triangle
-      and mesh.topology().cell_type() != mesh::CellType::tetrahedron)
+  if (cell_types[0] != mesh::CellType::triangle
+      and cell_types[0] != mesh::CellType::tetrahedron)
   {
     throw std::runtime_error("Cell type not supported");
   }
@@ -607,8 +610,12 @@ plaza::compute_refinement_data(
     const mesh::Mesh& mesh,
     const mesh::MeshTags<std::int8_t>& refinement_marker)
 {
-  if (mesh.topology().cell_type() != mesh::CellType::triangle
-      and mesh.topology().cell_type() != mesh::CellType::tetrahedron)
+  const std::vector<mesh::CellType>& cell_types = mesh.topology().cell_types();
+  if (cell_types.size() > 1)
+    throw std::runtime_error("mixed mesh");
+
+  if (cell_types[0] != mesh::CellType::triangle
+      and cell_types[0] != mesh::CellType::tetrahedron)
   {
     throw std::runtime_error("Cell type not supported");
   }

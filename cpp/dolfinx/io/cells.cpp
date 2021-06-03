@@ -368,9 +368,13 @@ io::cells::compute_permutation(const xt::xtensor<std::int64_t, 2>& cells,
 std::int8_t io::cells::get_vtk_cell_type(const dolfinx::mesh::Mesh& mesh,
                                          int dim)
 {
+  const std::vector<mesh::CellType>& cell_types = mesh.topology().cell_types();
+
+  if (cell_types.size() > 1)
+    throw std::runtime_error("mixed mesh");
+
   // Get cell type
-  mesh::CellType cell_type
-      = mesh::cell_entity_type(mesh.topology().cell_type(), dim);
+  mesh::CellType cell_type = mesh::cell_entity_type(cell_types[0], dim);
 
   // Determine VTK cell type (Using arbitrary Lagrange elements)
   // https://vtk.org/doc/nightly/html/vtkCellType_8h_source.html

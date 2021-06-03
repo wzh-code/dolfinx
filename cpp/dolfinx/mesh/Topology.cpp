@@ -149,12 +149,12 @@ std::vector<bool> mesh::compute_boundary_facets(const Topology& topology)
   return _boundary_facet;
 }
 //-----------------------------------------------------------------------------
-Topology::Topology(MPI_Comm comm, mesh::CellType type)
-    : _mpi_comm(comm), _cell_type(type),
+Topology::Topology(MPI_Comm comm, std::vector<mesh::CellType> types)
+    : _mpi_comm(comm), _cell_types(types),
       _connectivity(
-          mesh::cell_dim(type) + 1,
+          mesh::cell_dim(types[0]) + 1,
           std::vector<std::shared_ptr<graph::AdjacencyList<std::int32_t>>>(
-              mesh::cell_dim(type) + 1))
+              mesh::cell_dim(types[0]) + 1))
 {
   // Do nothing
 }
@@ -295,7 +295,10 @@ const std::vector<std::uint8_t>& Topology::get_facet_permutations() const
   return _facet_permutations;
 }
 //-----------------------------------------------------------------------------
-mesh::CellType Topology::cell_type() const { return _cell_type; }
+const std::vector<mesh::CellType>& Topology::cell_types() const
+{
+  return _cell_types;
+}
 //-----------------------------------------------------------------------------
 MPI_Comm Topology::mpi_comm() const { return _mpi_comm.comm(); }
 //-----------------------------------------------------------------------------
@@ -603,7 +606,7 @@ mesh::create_topology(MPI_Comm comm,
         std::move(my_local_cells_array), cells.offsets());
   }
 
-  Topology topology(comm, cell_type);
+  Topology topology(comm, {cell_type});
   const int tdim = topology.dim();
 
   // Vertex IndexMap

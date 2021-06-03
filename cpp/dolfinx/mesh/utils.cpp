@@ -64,9 +64,12 @@ std::vector<double> mesh::h(const Mesh& mesh,
   if (dim != mesh.topology().dim())
     throw std::runtime_error("Cell size when dim ne tdim  requires updating.");
 
+  const std::vector<mesh::CellType>& cell_types = mesh.topology().cell_types();
+  if (cell_types.size() > 1)
+    throw std::runtime_error("mixed mesh");
+
   // Get number of cell vertices
-  const mesh::CellType type
-      = cell_entity_type(mesh.topology().cell_type(), dim);
+  const mesh::CellType type = cell_entity_type(cell_types[0], dim);
   const int num_vertices = num_cell_vertices(type);
 
   // Get geometry dofmap and dofs
@@ -103,15 +106,18 @@ mesh::cell_normals(const mesh::Mesh& mesh, int dim,
                    const xtl::span<const std::int32_t>& entities)
 {
   const int gdim = mesh.geometry().dim();
-  const mesh::CellType type
-      = mesh::cell_entity_type(mesh.topology().cell_type(), dim);
+  const std::vector<mesh::CellType>& cell_types = mesh.topology().cell_types();
+  if (cell_types.size() > 1)
+    throw std::runtime_error("mixed mesh");
+
+  const mesh::CellType type = mesh::cell_entity_type(cell_types[0], dim);
 
   // Find geometry nodes for topology entities
   const xt::xtensor<double, 2>& xg = mesh.geometry().x();
 
   // Orient cells if they are tetrahedron
   bool orient = false;
-  if (mesh.topology().cell_type() == mesh::CellType::tetrahedron)
+  if (cell_types[0] == mesh::CellType::tetrahedron)
     orient = true;
   xt::xtensor<std::int32_t, 2> geometry_entities
       = entities_to_geometry(mesh, dim, entities, orient);
@@ -383,14 +389,17 @@ mesh::entities_to_geometry(const mesh::Mesh& mesh, int dim,
                            const xtl::span<const std::int32_t>& entity_list,
                            bool orient)
 {
-  dolfinx::mesh::CellType cell_type = mesh.topology().cell_type();
+  const std::vector<mesh::CellType>& cell_types = mesh.topology().cell_types();
+  if (cell_types.size() > 1)
+    throw std::runtime_error("mixed mesh");
+
   const std::size_t num_entity_vertices
-      = mesh::num_cell_vertices(mesh::cell_entity_type(cell_type, dim));
+      = mesh::num_cell_vertices(mesh::cell_entity_type(cell_types[0], dim));
   xt::xtensor<std::int32_t, 2> entity_geometry(
       {entity_list.size(), num_entity_vertices});
 
   if (orient
-      and (cell_type != dolfinx::mesh::CellType::tetrahedron or dim != 2))
+      and (cell_types[0] != dolfinx::mesh::CellType::tetrahedron or dim != 2))
   {
     throw std::runtime_error("Can only orient facets of a tetrahedral mesh");
   }

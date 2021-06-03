@@ -17,8 +17,12 @@ using namespace refinement;
 mesh::Mesh dolfinx::refinement::refine(const mesh::Mesh& mesh,
                                        bool redistribute)
 {
-  if (mesh.topology().cell_type() != mesh::CellType::triangle
-      and mesh.topology().cell_type() != mesh::CellType::tetrahedron)
+  const std::vector<mesh::CellType>& cell_types = mesh.topology().cell_types();
+  if (cell_types.size() > 1)
+    throw std::runtime_error("mixed mesh");
+
+  if (cell_types[0] != mesh::CellType::triangle
+      and cell_types[0] != mesh::CellType::tetrahedron)
   {
     throw std::runtime_error("Refinement only defined for simplices");
   }
@@ -41,8 +45,12 @@ dolfinx::refinement::refine(const mesh::Mesh& mesh,
                             const mesh::MeshTags<std::int8_t>& cell_markers,
                             bool redistribute)
 {
-  if (mesh.topology().cell_type() != mesh::CellType::triangle
-      and mesh.topology().cell_type() != mesh::CellType::tetrahedron)
+  const std::vector<mesh::CellType>& cell_types = mesh.topology().cell_types();
+  if (cell_types.size() > 1)
+    throw std::runtime_error("mixed mesh");
+
+  if (cell_types[0] != mesh::CellType::triangle
+      and cell_types[0] != mesh::CellType::tetrahedron)
   {
     throw std::runtime_error("Refinement only defined for simplices");
   }

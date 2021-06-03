@@ -395,8 +395,12 @@ xdmf_utils::extract_local_entities(const mesh::Mesh& mesh, const int entity_dim,
       entity_vertex_dofs.push_back(std::distance(entity_layout.begin(), it));
   }
 
+  const std::vector<mesh::CellType>& cell_types = mesh.topology().cell_types();
+  if (cell_types.size() > 1)
+    throw std::runtime_error("mixed mesh");
+
   const mesh::CellType entity_type
-      = mesh::cell_entity_type(mesh.topology().cell_type(), entity_dim);
+      = mesh::cell_entity_type(cell_types[0], entity_dim);
   const std::size_t num_vertices_per_entity
       = mesh::cell_num_entities(entity_type, 0);
   assert(entity_vertex_dofs.size() == num_vertices_per_entity);

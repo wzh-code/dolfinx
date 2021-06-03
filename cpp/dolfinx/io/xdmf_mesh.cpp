@@ -26,9 +26,13 @@ void xdmf_mesh::add_topology_data(
 
   const int tdim = topology.dim();
 
+  const std::vector<mesh::CellType>& cell_types = topology.cell_types();
+  if (cell_types.size() > 1)
+    throw std::runtime_error("mixed mesh");
+
   // Get entity 'cell' type
   const mesh::CellType entity_cell_type
-      = mesh::cell_entity_type(topology.cell_type(), dim);
+      = mesh::cell_entity_type(cell_types[0], dim);
 
   // Get number of nodes per entity
   const int num_nodes_per_entity

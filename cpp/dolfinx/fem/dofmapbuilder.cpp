@@ -50,6 +50,10 @@ build_basic_dofmap(const mesh::Topology& topology,
   // Topological dimension
   const int D = topology.dim();
 
+  const std::vector<mesh::CellType>& cell_types = topology.cell_types();
+  if (cell_types.size() > 1)
+    throw std::runtime_error("mixed mesh");
+
   // Generate and number required mesh entities
   std::vector<bool> needs_entities(D + 1, false);
   std::vector<std::int32_t> num_mesh_entities_local(D + 1, 0),
@@ -110,7 +114,7 @@ build_basic_dofmap(const mesh::Topology& topology,
   std::vector<std::vector<int64_t>> entity_indices_global(D + 1);
   for (int d = 0; d <= D; ++d)
   {
-    const int num_entities = mesh::cell_num_entities(topology.cell_type(), d);
+    const int num_entities = mesh::cell_num_entities(cell_types[0], d);
     entity_indices_local[d].resize(num_entities);
     entity_indices_global[d].resize(num_entities);
   }

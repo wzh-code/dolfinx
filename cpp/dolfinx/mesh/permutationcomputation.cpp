@@ -230,8 +230,11 @@ std::vector<std::bitset<BITSETSIZE>>
 compute_edge_reflections(const mesh::Topology& topology)
 {
   const int tdim = topology.dim();
-  const mesh::CellType cell_type = topology.cell_type();
-  const int edges_per_cell = cell_num_entities(cell_type, 1);
+  const std::vector<mesh::CellType>& cell_types = topology.cell_types();
+  if (cell_types.size() > 1)
+    throw std::runtime_error("mixed mesh");
+
+  const int edges_per_cell = cell_num_entities(cell_types[0], 1);
 
   const std::int32_t num_cells = topology.connectivity(tdim, 0)->num_nodes();
 
@@ -294,10 +297,13 @@ compute_face_permutations(const mesh::Topology& topology)
 
   auto im = topology.index_map(0);
   assert(im);
-  const mesh::CellType cell_type = topology.cell_type();
-  const int faces_per_cell = cell_num_entities(cell_type, 2);
-  if (cell_type == mesh::CellType::triangle
-      or cell_type == mesh::CellType::tetrahedron)
+  const std::vector<mesh::CellType>& cell_types = topology.cell_types();
+  if (cell_types.size() > 1)
+    throw std::runtime_error("mixed mesh");
+
+  const int faces_per_cell = cell_num_entities(cell_types[0], 2);
+  if (cell_types[0] == mesh::CellType::triangle
+      or cell_types[0] == mesh::CellType::tetrahedron)
   {
     return compute_face_permutations_simplex<BITSETSIZE>(
         *c_to_v, *c_to_f, *f_to_v, faces_per_cell, *im);
@@ -316,16 +322,19 @@ std::pair<std::vector<std::uint8_t>, std::vector<std::uint32_t>>
 mesh::compute_entity_permutations(const mesh::Topology& topology)
 {
   const int tdim = topology.dim();
-  const CellType cell_type = topology.cell_type();
+  const std::vector<CellType>& cell_types = topology.cell_types();
+  if (cell_types.size() > 1)
+    throw std::runtime_error("mixed mesh");
+
   const std::int32_t num_cells = topology.connectivity(tdim, 0)->num_nodes();
-  const int facets_per_cell = cell_num_entities(cell_type, tdim - 1);
+  const int facets_per_cell = cell_num_entities(cell_types[0], tdim - 1);
 
   std::vector<std::uint32_t> cell_permutation_info(num_cells, 0);
   std::vector<std::uint8_t> facet_permutations(num_cells * facets_per_cell);
   std::int32_t used_bits = 0;
   if (tdim > 2)
   {
-    const int faces_per_cell = cell_num_entities(cell_type, 2);
+    const int faces_per_cell = cell_num_entities(cell_types[0], 2);
     const auto face_perm = compute_face_permutations<_BITSETSIZE>(topology);
     for (int c = 0; c < num_cells; ++c)
       cell_permutation_info[c] = face_perm[c].to_ulong();
@@ -346,7 +355,7 @@ mesh::compute_entity_permutations(const mesh::Topology& topology)
 
   if (tdim > 1)
   {
-    const int edges_per_cell = cell_num_entities(cell_type, 1);
+    const int edges_per_cell = cell_num_entities(cell_types[0], 1);
     const auto edge_perm = compute_edge_reflections<_BITSETSIZE>(topology);
     for (int c = 0; c < num_cells; ++c)
       cell_permutation_info[c] |= edge_perm[c].to_ulong() << used_bits;

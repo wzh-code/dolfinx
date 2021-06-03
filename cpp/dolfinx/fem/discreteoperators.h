@@ -84,6 +84,10 @@ void fem::assemble_discrete_gradient(
                              "spaces do not share the same mesh");
   }
 
+  const std::vector<mesh::CellType>& cell_types = mesh->topology().cell_types();
+  if (cell_types.size() > 1)
+    throw std::runtime_error("mixed mesh");
+
   // Check that V0 is a (lowest-order) edge basis
   mesh->topology_mutable().create_entities(1);
   std::int64_t num_edges_global = mesh->topology().index_map(1)->size_global();
@@ -140,14 +144,12 @@ void fem::assemble_discrete_gradient(
   const std::shared_ptr<const fem::DofMap> dofmap0 = V0.dofmap();
   assert(dofmap0);
   // Create local lookup table for local edge to cell dofs
-  const int num_edges_per_cell
-      = mesh::cell_num_entities(mesh->topology().cell_type(), 1);
+  const int num_edges_per_cell = mesh::cell_num_entities(cell_types[0], 1);
   std::map<std::int32_t, std::vector<std::int32_t>> local_edge_dofs;
   for (std::int32_t i = 0; i < num_edges_per_cell; ++i)
     local_edge_dofs[i] = layout0->entity_dofs(1, i);
   // Create local lookup table for local vertex to cell dofs
-  const int num_vertices_per_cell
-      = mesh::cell_num_entities(mesh->topology().cell_type(), 0);
+  const int num_vertices_per_cell = mesh::cell_num_entities(cell_types[0], 0);
   std::map<std::int32_t, std::vector<std::int32_t>> local_vertex_dofs;
   for (std::int32_t i = 0; i < num_vertices_per_cell; ++i)
     local_vertex_dofs[i] = layout1->entity_dofs(0, i);

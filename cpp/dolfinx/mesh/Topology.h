@@ -57,7 +57,7 @@ class Topology
 {
 public:
   /// Create empty mesh topology
-  Topology(MPI_Comm comm, mesh::CellType type);
+  Topology(MPI_Comm comm, std::vector<mesh::CellType> types);
 
   /// Copy constructor
   Topology(const Topology& topology) = default;
@@ -120,7 +120,7 @@ public:
 
   /// Cell type
   /// @return Cell type that the topology is for
-  mesh::CellType cell_type() const;
+  const std::vector<mesh::CellType>& cell_types() const;
 
   // TODO: Rework memory management and associated API
   // Currently, there is no clear caching policy implemented and no way of
@@ -153,7 +153,7 @@ private:
   dolfinx::MPI::Comm _mpi_comm;
 
   // Cell type
-  mesh::CellType _cell_type;
+  std::vector<mesh::CellType> _cell_types;
 
   // IndexMap to store ghosting for each entity dimension
   std::array<std::shared_ptr<const common::IndexMap>, 4> _index_map;

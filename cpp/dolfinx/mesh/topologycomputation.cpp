@@ -60,13 +60,11 @@ std::vector<std::int32_t> sort_by_perm(const xt::xtensor<T, 2>& array)
 {
   std::vector<int> index(array.shape(0));
   std::iota(index.begin(), index.end(), 0);
-  std::sort(index.begin(), index.end(),
-            [&array](int a, int b)
-            {
-              return std::lexicographical_compare(
-                  xt::row(array, a).begin(), xt::row(array, a).end(),
-                  xt::row(array, b).begin(), xt::row(array, b).end());
-            });
+  std::sort(index.begin(), index.end(), [&array](int a, int b) {
+    return std::lexicographical_compare(
+        xt::row(array, a).begin(), xt::row(array, a).end(),
+        xt::row(array, b).begin(), xt::row(array, b).end());
+  });
 
   return index;
 }
@@ -628,6 +626,10 @@ mesh::compute_entities(MPI_Comm comm, const Topology& topology, int dim)
   LOG(INFO) << "Computing mesh entities of dimension " << dim;
   const int tdim = topology.dim();
 
+  const std::vector<mesh::CellType>& cell_types = topology.cell_types();
+  if (cell_types.size() > 1)
+    throw std::runtime_error("mixed mesh");
+
   // Vertices must always exist
   if (dim == 0)
     return {nullptr, nullptr, nullptr};
@@ -657,8 +659,8 @@ mesh::compute_entities(MPI_Comm comm, const Topology& topology, int dim)
   std::tuple<std::shared_ptr<graph::AdjacencyList<std::int32_t>>,
              std::shared_ptr<graph::AdjacencyList<std::int32_t>>,
              std::shared_ptr<common::IndexMap>>
-      data = compute_entities_by_key_matching(
-          comm, *cells, vertex_map, cell_map, topology.cell_type(), dim);
+      data = compute_entities_by_key_matching(comm, *cells, vertex_map,
+                                              cell_map, cell_types[0], dim);
 
   return data;
 }
@@ -667,6 +669,10 @@ std::array<std::shared_ptr<graph::AdjacencyList<std::int32_t>>, 2>
 mesh::compute_connectivity(const Topology& topology, int d0, int d1)
 {
   LOG(INFO) << "Requesting connectivity " << d0 << " - " << d1;
+
+  const std::vector<mesh::CellType>& cell_types = topology.cell_types();
+  if (cell_types.size() > 1)
+    throw std::runtime_error("mixed mesh");
 
   // Return if connectivity has already been computed
   if (topology.connectivity(d0, d1))
@@ -707,8 +713,7 @@ mesh::compute_connectivity(const Topology& topology, int d0, int d1)
     {
       auto c_d1_d0 = std::make_shared<graph::AdjacencyList<std::int32_t>>(
           compute_from_map(*c_d1_0, *c_d0_0,
-                           mesh::cell_entity_type(topology.cell_type(), d1), d1,
-                           d0));
+                           mesh::cell_entity_type(cell_types[0], d1), d1, d0));
       auto c_d0_d1 = std::make_shared<graph::AdjacencyList<std::int32_t>>(
           compute_from_transpose(*c_d1_d0, c_d0_0->num_nodes(), d0, d1));
       return {c_d0_d1, c_d1_d0};
@@ -727,10 +732,9 @@ mesh::compute_connectivity(const Topology& topology, int d0, int d1)
   {
     // Compute by mapping vertices from a lower dimension entity to
     // those of a higher dimension entity
-    auto c_d0_d1
-        = std::make_shared<graph::AdjacencyList<std::int32_t>>(compute_from_map(
-            *c_d0_0, *c_d1_0, mesh::cell_entity_type(topology.cell_type(), d0),
-            d0, d1));
+    auto c_d0_d1 = std::make_shared<graph::AdjacencyList<std::int32_t>>(
+        compute_from_map(*c_d0_0, *c_d1_0,
+                         mesh::cell_entity_type(cell_types[0], d0), d0, d1));
     return {c_d0_d1, nullptr};
   }
   else
