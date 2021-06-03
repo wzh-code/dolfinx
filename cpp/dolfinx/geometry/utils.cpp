@@ -185,9 +185,9 @@ void _compute_collisions_tree(const geometry::BoundingBoxTree& A,
   else if (node_A > node_B)
   {
     // At this point, we know neither is a leaf so descend the largest
-    // tree first. Note that nodes are added in reverse order with the top
-    // bounding box at the end so the largest tree (the one with the the
-    // most boxes left to traverse) has the largest node number.
+    // tree first. Note that nodes are added in reverse order with the
+    // top bounding box at the end so the largest tree (the one with the
+    // the most boxes left to traverse) has the largest node number.
     _compute_collisions_tree(A, B, bbox_A[0], node_B, entities);
     _compute_collisions_tree(A, B, bbox_A[1], node_B, entities);
   }

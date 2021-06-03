@@ -31,7 +31,14 @@ void geometry(py::module& m)
 {
   xt::import_numpy();
 
-  m.def("create_midpoint_tree", &dolfinx::geometry::create_midpoint_tree);
+  m.def("create_midpoint_tree",
+        [](const dolfinx::mesh::Mesh& mesh, int tdim,
+           const py::array_t<std::int32_t, py::array::c_style>& entities)
+        {
+          return dolfinx::geometry::create_midpoint_tree(
+              mesh, tdim, xtl::span(entities.data(), entities.size()));
+        });
+
   m.def("compute_closest_entity", &dolfinx::geometry::compute_closest_entity,
         py::arg("tree"), py::arg("p"), py::arg("mesh"), py::arg("R") = -1);
 
