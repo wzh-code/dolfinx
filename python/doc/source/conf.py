@@ -148,6 +148,7 @@ man_pages = [
 autodoc_default_options = {'members': True, 'show-inheritance': True, 'imported-members': True, 'undoc-members': True}
 autosummary_generate = True
 autoclass_content = "both"
+autodoc_member_order = 'bysource'
 
 napoleon_google_docstring = False
 napoleon_use_admonition_for_notes = False

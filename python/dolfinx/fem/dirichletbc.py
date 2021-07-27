@@ -20,7 +20,7 @@ from dolfinx.fem.function import Function, FunctionSpace
 
 
 def locate_dofs_geometrical(V: typing.Iterable[typing.Union[cpp.fem.FunctionSpace, FunctionSpace]],
-                            marker: types.FunctionType):
+                            marker: types.FunctionType) -> typing.Union[np.ndarray, typing.Tuple[np.ndarray, np.ndarray]]:
     """Locate degrees-of-freedom geometrically using a marker function.
 
     Parameters
@@ -41,12 +41,9 @@ def locate_dofs_geometrical(V: typing.Iterable[typing.Union[cpp.fem.FunctionSpac
         for degrees-of-freedom whose coordinate evaluates to True for the
         marker function.
 
-        If ``V`` is a list of two function spaces, then a 2-D array of
-        shape (number of dofs, 2) is returned.
+        If ``V`` is a list of two function spaces, then a pair of arrays is returned.
 
-        Returned degree-of-freedom indices are unique and ordered by the
-        first column.
-
+        Returned degree-of-freedom indices are unique the first array is sorted.
     """
 
     if isinstance(V, collections.abc.Sequence):
@@ -67,8 +64,8 @@ def locate_dofs_geometrical(V: typing.Iterable[typing.Union[cpp.fem.FunctionSpac
 
 def locate_dofs_topological(V: typing.Iterable[typing.Union[cpp.fem.FunctionSpace, FunctionSpace]],
                             entity_dim: int,
-                            entities: typing.List[int],
-                            remote: bool = True):
+                            entities: typing.Sequence[int],
+                            remote: bool = True) -> typing.Union[np.ndarray, typing.Tuple[np.ndarray, np.ndarray]]:
     """Locate degrees-of-freedom belonging to mesh entities topologically.
 
     Parameters
@@ -81,7 +78,7 @@ def locate_dofs_topological(V: typing.Iterable[typing.Union[cpp.fem.FunctionSpac
         Indices of mesh entities of dimension ``entity_dim`` where
         degrees-of-freedom are located.
     remote : True
-        True to return also "remotely located" degree-of-freedom indices.
+        True to also return "remotely located" degree-of-freedom indices.
 
     Returns
     -------
@@ -89,11 +86,9 @@ def locate_dofs_topological(V: typing.Iterable[typing.Union[cpp.fem.FunctionSpac
         An array of degree-of-freedom indices (local to the process) for
         degrees-of-freedom topologically belonging to mesh entities.
 
-        If ``V`` is a list of two function spaces, then a 2-D array of
-        shape (number of dofs, 2) is returned.
+        If ``V`` is a list of two function spaces, then a pair of arrays is returned.
 
-        Returned degree-of-freedom indices are unique and ordered by the
-        first column.
+        Returned degree-of-freedom indices are unique the first array is sorted.
     """
 
     _entities = np.asarray(entities, dtype=np.int32)
@@ -117,21 +112,24 @@ class DirichletBC(cpp.fem.DirichletBC):
     def __init__(
             self,
             value: typing.Union[ufl.Coefficient, Function, cpp.fem.Function],
-            dofs: typing.List[int],
+            dofs: typing.Union[typing.Sequence[int], typing.Tuple[typing.Sequence[int], typing.Sequence[int]]],
             V: typing.Union[FunctionSpace] = None):
-        """Representation of Dirichlet boundary condition which is imposed on
-        a linear system.
+        """Representation of a Dirichlet boundary condition that is
+        imposed on a linear system.
 
         Parameters
         ----------
         value
             Lifted boundary values function.
         dofs
-            Local indices of degrees of freedom in function space to which
-            boundary condition applies.
-            Expects array of size (number of dofs, 2) if function space of the
-            problem, ``V``, is passed. Otherwise assumes function space of the
-            problem is the same of function space of boundary values function.
+            Local indices of degrees-of-freedom in function space to which
+            boundary condition is applied.
+            Expects a tuple of length two of local indices if function
+            space ``V`` is provides, in which case the first array
+            contains the local indices for the function space that
+            ``value`` is defined on and the second array in the tuple
+            contains the corresponding local degree-of-freedom indices
+            in ``V``.
         V : optional
             Function space of a problem to which boundary conditions are applied.
         """

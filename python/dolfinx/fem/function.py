@@ -154,12 +154,12 @@ class Expression:
         return self._cpp_object.x
 
     @property
-    def num_points(self):
+    def num_points(self) -> int:
         """Return the number of evaluation points on the reference cell."""
         return self._cpp_object.num_points
 
     @property
-    def value_size(self):
+    def value_size(self) -> int:
         """Return the value size of the expression"""
         return self._cpp_object.value_size
 
@@ -169,7 +169,7 @@ class Expression:
         return self._ufc_expression
 
     @property
-    def code(self):
+    def code(self) -> str:
         """Return C code strings"""
         return self._code
 

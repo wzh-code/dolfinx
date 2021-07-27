@@ -110,7 +110,8 @@ void fem(py::module& m)
       "create_dofmap",
       [](const MPICommWrapper comm, const std::uintptr_t dofmap,
          dolfinx::mesh::Topology& topology,
-         std::shared_ptr<dolfinx::fem::FiniteElement> element) {
+         std::shared_ptr<dolfinx::fem::FiniteElement> element)
+      {
         const ufc_dofmap* p = reinterpret_cast<const ufc_dofmap*>(dofmap);
         return dolfinx::fem::create_dofmap(comm.get(), *p, topology, nullptr,
                                            element);
