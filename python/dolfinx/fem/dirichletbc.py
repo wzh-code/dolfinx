@@ -20,7 +20,8 @@ from dolfinx.fem.function import Function, FunctionSpace
 
 
 def locate_dofs_geometrical(V: typing.Iterable[typing.Union[cpp.fem.FunctionSpace, FunctionSpace]],
-                            marker: types.FunctionType) -> typing.Union[np.ndarray, typing.Tuple[np.ndarray, np.ndarray]]:
+                            marker: types.FunctionType) -> typing.Union[np.ndarray,
+                                                                        typing.Tuple[np.ndarray, np.ndarray]]:
     """Locate degrees-of-freedom geometrically using a marker function.
 
     Parameters
