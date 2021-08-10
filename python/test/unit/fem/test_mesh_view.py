@@ -13,10 +13,11 @@ bools[1] = True
 bools[3] = True
 values = indices[bools]
 ct = dolfinx.MeshTags(mesh, tdim, values, values)
-# mv = dolfinx.cpp.mesh.MeshView(ct)
-# top = mv.topology
+mv = dolfinx.cpp.mesh.MeshView(ct)
+top = mv.topology
+embed()
+V = dolfinx.FunctionSpace(mv, ("CG", 1))
 
-# V = dolfinx.FunctionSpace(mv, ("CG", 1))
 
 class MeshViewPy():
     def __init__(self, meshtag: dolfinx.MeshTags):
@@ -24,7 +25,7 @@ class MeshViewPy():
         mesh.topology.create_connectivity(meshtag.dim, 0)
         e_to_v = mesh.topology.connectivity(meshtag.dim, 0)
 
-        data= []
+        data = []
         offset = [0]
 
         num_entities = e_to_v.num_nodes
@@ -62,9 +63,9 @@ class MeshViewPy():
         self.dim = meshtag.dim
 
 
-mv = MeshViewPy(ct)
+#mv = MeshViewPy(ct)
 
-print("HI")
+# print("HI")
 # mv = MeshViewPy(ct)
 # num_cells_local = mv.topology.index_map(mv.dim).size_local
 # for cell in range(num_cells_local):
