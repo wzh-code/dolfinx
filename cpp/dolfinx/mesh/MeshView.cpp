@@ -79,3 +79,6 @@ MeshView::MeshView(std::shared_ptr<const MeshTags<std::int32_t>> meshtag)
 }
 
 std::shared_ptr<mesh::Topology> MeshView::topology() { return _topology; }
+std::shared_ptr<const Mesh> MeshView::mesh(){return _mesh;}
+std::int32_t MeshView::dim(){return _dim;}
+const std::vector<std::int32_t>& MeshView::entities(){return _entities;}
