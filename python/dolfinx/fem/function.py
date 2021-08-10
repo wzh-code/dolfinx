@@ -382,7 +382,10 @@ class FunctionSpace(ufl.FunctionSpace):
             # FIXME This won't work when codim \neq 0
             if isinstance(element, ufl.FiniteElementBase):
                 super().__init__(mesh.ufl_domain(), element)
-            assert False
+            else:
+                e = ElementMetaData(*element)
+                ufl_element = ufl.FiniteElement(e.family, mesh.ufl_cell(), e.degree, form_degree=e.form_degree)
+                super().__init__(mesh.ufl_domain(), ufl_element)
         else:
             mesh = mesh_object
 
@@ -402,7 +405,7 @@ class FunctionSpace(ufl.FunctionSpace):
         ffi = cffi.FFI()
         cpp_element = cpp.fem.FiniteElement(ffi.cast("uintptr_t", ffi.addressof(self._ufc_element)))
         cpp_dofmap = cpp.fem.create_dofmap(mesh.mpi_comm(), ffi.cast(
-            "uintptr_t", ffi.addressof(self._ufc_dofmap)), mesh.topology, cpp_element)
+            "uintptr_t", ffi.addressof(self._ufc_dofmap)), mesh_object.topology, cpp_element)
 
         # Initialize the cpp.FunctionSpace
         self._cpp_object = cpp.fem.FunctionSpace(mesh, cpp_element, cpp_dofmap)
