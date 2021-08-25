@@ -32,6 +32,7 @@
 #include <dolfinx/la/PETScVector.h>
 #include <dolfinx/la/SparsityPattern.h>
 #include <dolfinx/mesh/Mesh.h>
+#include <dolfinx/mesh/MeshView.h>
 #include <dolfinx/mesh/MeshTags.h>
 #include <memory>
 #include <petsc4py/petsc4py.h>
@@ -549,6 +550,54 @@ void fem(py::module& m)
           py::arg("spaces"), py::arg("integrals"), py::arg("coefficients"),
           py::arg("constants"), py::arg("need_permutation_data"),
           py::arg("mesh") = py::none())
+      .def(
+          py::init(
+              [](const std::vector<std::shared_ptr<
+                     const dolfinx::fem::FunctionSpace>>& spaces,
+                 const std::map<
+                     dolfinx::fem::IntegralType,
+                     std::pair<std::vector<std::pair<int, py::object>>,
+                               const dolfinx::mesh::MeshTags<int>*>>& integrals,
+                 const std::vector<std::shared_ptr<
+                     const dolfinx::fem::Function<PetscScalar>>>& coefficients,
+                 const std::vector<std::shared_ptr<
+                     const dolfinx::fem::Constant<PetscScalar>>>& constants,
+                 bool needs_permutation_data,
+                 const std::shared_ptr<const dolfinx::mesh::MeshView>& mesh_view) {
+                // FIXME Most of this duplicates the above
+                using kern = std::function<void(
+                    PetscScalar*, const PetscScalar*, const PetscScalar*,
+                    const double*, const int*, const std::uint8_t*)>;
+                std::map<dolfinx::fem::IntegralType,
+                         std::pair<std::vector<std::pair<int, kern>>,
+                                   const dolfinx::mesh::MeshTags<int>*>>
+                    _integrals;
+
+                // Loop over kernel for each entity type
+                for (auto& kernel_type : integrals)
+                {
+                  // Set subdomain markers
+                  _integrals[kernel_type.first].second = nullptr;
+
+                  // Loop over each domain kernel
+                  for (auto& kernel : kernel_type.second.first)
+                  {
+                    auto tabulate_tensor_ptr
+                        = (void (*)(PetscScalar*, const PetscScalar*,
+                                    const PetscScalar*, const double*,
+                                    const int*, const std::uint8_t*))
+                              kernel.second.cast<std::uintptr_t>();
+                    _integrals[kernel_type.first].first.push_back(
+                        {kernel.first, tabulate_tensor_ptr});
+                  }
+                }
+                return dolfinx::fem::Form<PetscScalar>(
+                    spaces, _integrals, coefficients, constants,
+                    needs_permutation_data, mesh_view);
+              }),
+          py::arg("spaces"), py::arg("integrals"), py::arg("coefficients"),
+          py::arg("constants"), py::arg("need_permutation_data"),
+          py::arg("mesh_view"))
       .def_property_readonly("coefficients",
                              &dolfinx::fem::Form<PetscScalar>::coefficients)
       .def_property_readonly("rank", &dolfinx::fem::Form<PetscScalar>::rank)

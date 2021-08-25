@@ -20,7 +20,7 @@ def ufl_domain(self):
     domain = ufl.Mesh(ufl.VectorElement("Lagrange", cell=self.ufl_cell(),
                                         degree=1,
                                         dim=self.parent_mesh.geometry.dim))
-    domain._ufl_cargo = self.parent_mesh
+    domain._ufl_cargo = self
     return domain
 
 

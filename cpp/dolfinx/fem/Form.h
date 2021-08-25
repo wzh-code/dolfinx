@@ -8,6 +8,7 @@
 
 #include <dolfinx/fem/FunctionSpace.h>
 #include <dolfinx/mesh/Mesh.h>
+#include <dolfinx/mesh/MeshView.h>
 #include <dolfinx/mesh/MeshTags.h>
 #include <functional>
 #include <memory>
@@ -87,7 +88,7 @@ public:
       bool needs_facet_permutations,
       const std::shared_ptr<const mesh::Mesh>& mesh = nullptr)
       : _function_spaces(function_spaces), _coefficients(coefficients),
-        _constants(constants), _mesh(mesh),
+        _constants(constants), _mesh(mesh), _mesh_view(),
         _needs_facet_permutations(needs_facet_permutations)
   {
     // Extract _mesh from fem::FunctionSpace, and check they are the same
@@ -123,6 +124,37 @@ public:
     // FIXME: do this neatly via a static function
     // Set markers for default integrals
     set_default_domains(*_mesh);
+  }
+
+  /// Create form
+  ///
+  /// @param[in] function_spaces Function spaces for the form arguments
+  /// @param[in] integrals The integrals in the form. The first key is
+  /// the domain type. For each key there is a pair (list[domain id,
+  /// integration kernel], domain markers).
+  /// @param[in] coefficients
+  /// @param[in] constants Constants in the Form
+  /// @param[in] needs_facet_permutations Set to true is any of the
+  /// integration kernels require cell permutation data
+  /// @param[in] mesh_view The mesh view
+  Form(
+      const std::vector<std::shared_ptr<const fem::FunctionSpace>>&
+          function_spaces,
+      const std::map<
+          IntegralType,
+          std::pair<
+              std::vector<std::pair<
+                  int, std::function<void(T*, const T*, const T*, const double*,
+                                          const int*, const std::uint8_t*)>>>,
+              const mesh::MeshTags<int>*>>& integrals,
+      const std::vector<std::shared_ptr<const fem::Function<T>>>& coefficients,
+      const std::vector<std::shared_ptr<const fem::Constant<T>>>& constants,
+      bool needs_facet_permutations,
+      const std::shared_ptr<const mesh::MeshView>& mesh_view)
+      : _mesh_view(mesh_view)
+  {
+    Form(function_spaces, integrals, coefficients, constants,
+         needs_facet_permutations, mesh_view->parent_mesh());
   }
 
   /// Copy constructor
@@ -454,6 +486,9 @@ private:
 
   // The mesh
   std::shared_ptr<const mesh::Mesh> _mesh;
+
+  // The mesh view
+  std::shared_ptr<const mesh::MeshView> _mesh_view;
 
   using kern = std::function<void(T*, const T*, const T*, const double*,
                                   const int*, const std::uint8_t*)>;

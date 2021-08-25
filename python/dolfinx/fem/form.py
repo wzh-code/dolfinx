@@ -34,14 +34,17 @@ class Form:
         sd = form.subdomain_data()
         self._subdomains, = list(sd.values())  # Assuming single domain
         domain, = list(sd.keys())  # Assuming single domain
-        mesh = domain.ufl_cargo()
-        if mesh is None:
+        mesh_object = domain.ufl_cargo()
+        if mesh_object is None:
             raise RuntimeError("Expecting to find a Mesh in the form.")
+        elif isinstance(mesh_object, cpp.mesh.MeshView):
+            mpi_comm = mesh_object.parent_mesh.mpi_comm()
+        else:
+            mpi_comm = mesh_object.mpi_comm()
 
         # Compile UFL form with JIT
         self._ufc_form, module, self._code = jit.ffcx_jit(
-            mesh.mpi_comm(),
-            form,
+            mpi_comm, form,
             form_compiler_parameters=form_compiler_parameters,
             jit_parameters=jit_parameters)
 
@@ -67,7 +70,7 @@ class Form:
         ffi = cffi.FFI()
         self._cpp_object = cpp.fem.create_form(ffi.cast("uintptr_t", ffi.addressof(self._ufc_form)),
                                                function_spaces, coeffs,
-                                               [c._cpp_object for c in form.constants()], subdomains, mesh)
+                                               [c._cpp_object for c in form.constants()], subdomains, mesh_object)
 
     @property
     def ufc_form(self):
