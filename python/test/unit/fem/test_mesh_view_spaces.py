@@ -8,10 +8,7 @@
 # They are currently very simplistic.
 import dolfinx
 from mpi4py import MPI
-<<<<<<< HEAD
 import ufl
-=======
->>>>>>> origin/dokken/mesh-view
 
 
 def check_dofmap(mesh, dim):
