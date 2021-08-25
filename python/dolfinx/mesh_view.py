@@ -16,9 +16,12 @@ def ufl_cell(self):
 
 def ufl_domain(self):
     # TODO Get degree from mesh
-    return ufl.Mesh(ufl.VectorElement("Lagrange", cell=self.ufl_cell(),
-                                      degree=1,
-                                      dim=self.parent_mesh.geometry.dim))
+    # TODO Check this
+    domain = ufl.Mesh(ufl.VectorElement("Lagrange", cell=self.ufl_cell(),
+                                        degree=1,
+                                        dim=self.parent_mesh.geometry.dim))
+    domain._ufl_cargo = self.parent_mesh
+    return domain
 
 
 dolfinx.cpp.mesh.MeshView.ufl_cell = ufl_cell

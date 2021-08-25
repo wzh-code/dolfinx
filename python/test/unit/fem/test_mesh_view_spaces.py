@@ -8,6 +8,7 @@
 # They are currently very simplistic.
 import dolfinx
 from mpi4py import MPI
+import ufl
 
 
 def check_dofmap(mesh, dim):
@@ -27,3 +28,17 @@ def test_mesh_view_spaces():
         for codim in range(0, 2):
             dim = mesh.topology.dim - codim
             check_dofmap(mesh, dim)
+
+
+mesh = dolfinx.UnitSquareMesh(MPI.COMM_WORLD, 4, 2)
+dim = mesh.topology.dim
+entities = dolfinx.mesh.locate_entities(mesh, dim,
+                                        lambda x: x[0] <= 0.5)
+mv_cpp = dolfinx.cpp.mesh.MeshView(mesh, dim, entities)
+V = dolfinx.FunctionSpace(mv_cpp, ("Lagrange", 1))
+
+v = ufl.TestFunction(V)
+
+L = ufl.inner(1, v) * ufl.dx
+
+b = dolfinx.fem.assemble_vector(L)
