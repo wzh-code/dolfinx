@@ -18,6 +18,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <tuple>
 #include <ufc.h>
 #include <utility>
 #include <vector>
@@ -144,21 +145,24 @@ std::vector<std::string> get_coefficient_names(const ufc_form& ufc_form);
 /// return The name of each constant
 std::vector<std::string> get_constant_names(const ufc_form& ufc_form);
 
-/// Create a Form from UFC input
-/// @param[in] ufc_form The UFC form
-/// @param[in] spaces Vector of function spaces
-/// @param[in] coefficients Coefficient fields in the form
-/// @param[in] constants Spatial constants in the form
-/// @param[in] subdomains Subdomain markers
-/// @param[in] mesh The mesh of the domain
+// FIXME This is not very tidy
 template <typename T>
-Form<T> create_form(
+std::tuple<
+    std::map<
+        IntegralType,
+        std::pair<
+            std::vector<std::pair<
+                int, std::function<void(T*, const T*, const T*, const double*,
+                                        const int*, const std::uint8_t*)>>>,
+            const mesh::MeshTags<int>*>>,
+    bool>
+create_form_data(
     const ufc_form& ufc_form,
     const std::vector<std::shared_ptr<const fem::FunctionSpace>>& spaces,
     const std::vector<std::shared_ptr<const fem::Function<T>>>& coefficients,
     const std::vector<std::shared_ptr<const fem::Constant<T>>>& constants,
     const std::map<IntegralType, const mesh::MeshTags<int>*>& subdomains,
-    const std::shared_ptr<const mesh::Mesh>& mesh = nullptr)
+    const std::shared_ptr<const mesh::Mesh>& mesh)
 {
   if (ufc_form.rank != (int)spaces.size())
     throw std::runtime_error("Wrong number of argument spaces for Form.");
@@ -277,6 +281,28 @@ Form<T> create_form(
   {
     integral_data[IntegralType::interior_facet].second = it->second;
   }
+
+  return std::make_tuple(integral_data, needs_facet_permutations);
+}
+
+/// Create a Form from UFC input
+/// @param[in] ufc_form The UFC form
+/// @param[in] spaces Vector of function spaces
+/// @param[in] coefficients Coefficient fields in the form
+/// @param[in] constants Spatial constants in the form
+/// @param[in] subdomains Subdomain markers
+/// @param[in] mesh The mesh of the domain
+template <typename T>
+Form<T> create_form(
+    const ufc_form& ufc_form,
+    const std::vector<std::shared_ptr<const fem::FunctionSpace>>& spaces,
+    const std::vector<std::shared_ptr<const fem::Function<T>>>& coefficients,
+    const std::vector<std::shared_ptr<const fem::Constant<T>>>& constants,
+    const std::map<IntegralType, const mesh::MeshTags<int>*>& subdomains,
+    const std::shared_ptr<const mesh::Mesh>& mesh = nullptr)
+{
+  auto [integral_data, needs_facet_permutations] = create_form_data(
+      ufc_form, spaces, coefficients, constants, subdomains, mesh);
 
   return fem::Form(spaces, integral_data, coefficients, constants,
                    needs_facet_permutations, mesh);
