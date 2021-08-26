@@ -308,6 +308,31 @@ Form<T> create_form(
                    needs_facet_permutations, mesh);
 }
 
+/// Create a Form from UFC input and mesh view
+/// @param[in] ufc_form The UFC form
+/// @param[in] spaces Vector of function spaces
+/// @param[in] coefficients Coefficient fields in the form
+/// @param[in] constants Spatial constants in the form
+/// @param[in] subdomains Subdomain markers
+/// @param[in] mesh_view The mesh view
+template <typename T>
+Form<T> create_form(
+    const ufc_form& ufc_form,
+    const std::vector<std::shared_ptr<const fem::FunctionSpace>>& spaces,
+    const std::vector<std::shared_ptr<const fem::Function<T>>>& coefficients,
+    const std::vector<std::shared_ptr<const fem::Constant<T>>>& constants,
+    const std::map<IntegralType, const mesh::MeshTags<int>*>& subdomains,
+    const std::shared_ptr<const mesh::MeshView>& mesh_view)
+{
+  auto mesh = mesh_view->parent_mesh();
+
+  auto [integral_data, needs_facet_permutations] = create_form_data(
+      ufc_form, spaces, coefficients, constants, subdomains, mesh);
+
+  return fem::Form(spaces, integral_data, coefficients, constants,
+                   needs_facet_permutations, mesh_view);
+}
+
 /// Create a Form from UFC input
 /// @param[in] ufc_form The UFC form
 /// @param[in] spaces The function spaces for the Form arguments

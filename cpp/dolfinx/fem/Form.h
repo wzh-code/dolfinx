@@ -8,8 +8,8 @@
 
 #include <dolfinx/fem/FunctionSpace.h>
 #include <dolfinx/mesh/Mesh.h>
-#include <dolfinx/mesh/MeshView.h>
 #include <dolfinx/mesh/MeshTags.h>
+#include <dolfinx/mesh/MeshView.h>
 #include <functional>
 #include <memory>
 #include <string>
@@ -151,10 +151,10 @@ public:
       const std::vector<std::shared_ptr<const fem::Constant<T>>>& constants,
       bool needs_facet_permutations,
       const std::shared_ptr<const mesh::MeshView>& mesh_view)
-      : _mesh_view(mesh_view)
+      : Form(function_spaces, integrals, coefficients, constants,
+             needs_facet_permutations, mesh_view->parent_mesh())
   {
-    Form(function_spaces, integrals, coefficients, constants,
-         needs_facet_permutations, mesh_view->parent_mesh());
+    _mesh_view = mesh_view;
   }
 
   /// Copy constructor

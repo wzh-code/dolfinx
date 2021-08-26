@@ -137,6 +137,24 @@ void fem(py::module& m)
       },
       "Create Form from a pointer to ufc_form.");
   m.def(
+      "create_form",
+      [](const std::uintptr_t form,
+         const std::vector<std::shared_ptr<const dolfinx::fem::FunctionSpace>>&
+             spaces,
+         const std::vector<std::shared_ptr<
+             const dolfinx::fem::Function<PetscScalar>>>& coefficients,
+         const std::vector<std::shared_ptr<
+             const dolfinx::fem::Constant<PetscScalar>>>& constants,
+         const std::map<dolfinx::fem::IntegralType,
+                        const dolfinx::mesh::MeshTags<int>*>& subdomains,
+         const std::shared_ptr<const dolfinx::mesh::MeshView>& mesh_view)
+      {
+        const ufc_form* p = reinterpret_cast<const ufc_form*>(form);
+        return dolfinx::fem::create_form<PetscScalar>(
+            *p, spaces, coefficients, constants, subdomains, mesh_view);
+      },
+      "Create Form from a pointer to ufc_form with mesh view.");
+  m.def(
       "build_dofmap",
       [](const MPICommWrapper comm, const dolfinx::mesh::Topology& topology,
          const dolfinx::fem::ElementDofLayout& element_dof_layout)

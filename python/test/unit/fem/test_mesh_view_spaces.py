@@ -42,3 +42,4 @@ v = ufl.TestFunction(V)
 L = ufl.inner(1, v) * ufl.dx
 
 b = dolfinx.fem.assemble_vector(L)
+print(b[:])
