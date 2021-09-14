@@ -14,8 +14,9 @@
 
 namespace dolfinx::fem
 {
+class CoordinateElement;
 class ElementDofLayout;
-}
+} // namespace dolfinx::fem
 
 namespace dolfinx::mesh
 {
@@ -33,7 +34,8 @@ class Mesh;
 /// 'gaps' due to mid-side and other higher-order nodes being removed
 /// from the input @p cell.
 graph::AdjacencyList<std::int64_t>
-extract_topology(const CellType& cell_type, const fem::ElementDofLayout& layout,
+extract_topology(const std::vector<std::uint8_t>& cell_elements,
+                 const std::vector<fem::CoordinateElement>& layout,
                  const graph::AdjacencyList<std::int64_t>& cells);
 
 /// Compute greatest distance between any two vertices

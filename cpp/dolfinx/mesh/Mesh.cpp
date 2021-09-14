@@ -11,6 +11,7 @@
 #include "topologycomputation.h"
 #include "utils.h"
 #include <dolfinx/common/IndexMap.h>
+#include <dolfinx/common/log.h>
 #include <dolfinx/common/utils.h>
 #include <dolfinx/fem/CoordinateElement.h>
 #include <dolfinx/graph/AdjacencyList.h>
@@ -81,9 +82,11 @@ Mesh mesh::create_mesh(MPI_Comm comm,
   // should just be the identity operator. For other elements the
   // filtered lists may have 'gaps', i.e. the indices might not be
   // contiguous.
+
+  // Define all cells as type 0.
+  std::vector<std::uint8_t> cell_elements(cells.num_nodes(), 0);
   const graph::AdjacencyList<std::int64_t> cells_topology
-      = mesh::extract_topology(element.cell_shape(), element.dof_layout(),
-                               cells);
+      = mesh::extract_topology(cell_elements, {element}, cells);
 
   // Compute the destination rank for cells on this process via graph
   // partitioning. Always get the ghost cells via facet, though these
@@ -98,9 +101,9 @@ Mesh mesh::create_mesh(MPI_Comm comm,
       = graph::build::distribute(comm, cells, dest);
 
   // Extract cell 'topology', i.e. the vertices for each cell
+  cell_elements.resize(cell_nodes0.num_nodes(), 0);
   const graph::AdjacencyList<std::int64_t> cells_extracted0
-      = mesh::extract_topology(element.cell_shape(), element.dof_layout(),
-                               cell_nodes0);
+      = mesh::extract_topology(cell_elements, {element}, cell_nodes0);
 
   // Build local dual graph for owned cells to apply re-ordering to
   const std::int32_t num_owned_cells
