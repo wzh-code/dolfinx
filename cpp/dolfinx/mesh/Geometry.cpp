@@ -8,6 +8,7 @@
 #include "Topology.h"
 #include <boost/functional/hash.hpp>
 #include <dolfinx/common/IndexMap.h>
+#include <dolfinx/common/log.h>
 #include <dolfinx/common/sort.h>
 #include <dolfinx/fem/ElementDofLayout.h>
 #include <dolfinx/fem/dofmapbuilder.h>
@@ -53,9 +54,14 @@ mesh::Geometry mesh::create_geometry(
   // TODO: make sure required entities are initialised, or extend
   // fem::build_dofmap_data
 
+  LOG(INFO) << "Create geometry";
+
   //  Build 'geometry' dofmap on the topology
   auto [dof_index_map, bs, dofmap] = fem::build_dofmap_data(
       comm, topology, coordinate_element.dof_layout(), reorder_fn);
+
+  LOG(INFO) << "Got geometry dofmap";
+  LOG(INFO) << dofmap.str();
 
   // If the mesh has higher order geometry, permute the dofmap
   if (coordinate_element.needs_dof_permutations())

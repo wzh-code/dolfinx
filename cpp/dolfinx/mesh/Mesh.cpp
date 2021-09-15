@@ -83,10 +83,20 @@ Mesh mesh::create_mesh(MPI_Comm comm,
   // filtered lists may have 'gaps', i.e. the indices might not be
   // contiguous.
 
-  // Define all cells as type 0.
-  std::vector<std::uint8_t> cell_elements(cells.num_nodes(), 0);
+  // Assign as triangle or quad based on number of nodes
+  std::vector<std::uint8_t> cell_element_types(cells.num_nodes(), 0);
+  for (int i = 0; i < cells.num_nodes(); ++i)
+    if (cells.num_links(i) == 4)
+      cell_element_types[i] = 1;
+
+  std::vector<fem::CoordinateElement> el_types
+      = {fem::CoordinateElement(CellType::triangle, 1),
+         fem::CoordinateElement(CellType::quadrilateral, 1)};
+
   const graph::AdjacencyList<std::int64_t> cells_topology
-      = mesh::extract_topology(cell_elements, {element}, cells);
+      = mesh::extract_topology(cell_element_types, el_types, cells);
+
+  LOG(INFO) << cells_topology.str();
 
   // Compute the destination rank for cells on this process via graph
   // partitioning. Always get the ghost cells via facet, though these
@@ -96,14 +106,26 @@ Mesh mesh::create_mesh(MPI_Comm comm,
   const graph::AdjacencyList<std::int32_t> dest = cell_partitioner(
       comm, size, tdim, cells_topology, GhostMode::shared_facet);
 
+  graph::AdjacencyList<std::int64_t> cell_types_send(cell_element_types.size());
+  std::copy(cell_element_types.begin(), cell_element_types.end(),
+            cell_types_send.array().begin());
+
+  // Distribute cell types to destination rank
+  const auto [cell_elements0, a0, a1, a2]
+      = graph::build::distribute(comm, cell_types_send, dest);
+
   // Distribute cells to destination rank
   const auto [cell_nodes0, src, original_cell_index0, ghost_owners]
       = graph::build::distribute(comm, cells, dest);
 
+  LOG(INFO) << "DIstrib mesh = " << cell_nodes0.str() << "\n";
+  LOG(INFO) << "DIstrib types = " << cell_elements0.str() << "\n";
+
   // Extract cell 'topology', i.e. the vertices for each cell
-  cell_elements.resize(cell_nodes0.num_nodes(), 0);
+  cell_element_types.assign(cell_elements0.array().begin(),
+                            cell_elements0.array().end());
   const graph::AdjacencyList<std::int64_t> cells_extracted0
-      = mesh::extract_topology(cell_elements, {element}, cell_nodes0);
+      = mesh::extract_topology(cell_element_types, el_types, cell_nodes0);
 
   // Build local dual graph for owned cells to apply re-ordering to
   const std::int32_t num_owned_cells
@@ -134,6 +156,8 @@ Mesh mesh::create_mesh(MPI_Comm comm,
   Topology topology
       = mesh::create_topology(comm, cells_extracted, original_cell_index,
                               ghost_owners, element.cell_shape(), ghost_mode);
+
+  LOG(INFO) << "Topology OK: " << topology.connectivity(2, 0)->str() << "\n";
 
   // Create connectivity required to compute the Geometry (extra
   // connectivities for higher-order geometries)

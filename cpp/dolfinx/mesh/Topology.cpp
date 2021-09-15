@@ -297,14 +297,15 @@ mesh::create_topology(MPI_Comm comm,
                       const CellType& cell_type, mesh::GhostMode ghost_mode)
 {
   LOG(INFO) << "Create topology";
-  if (cells.num_nodes() > 0
-      and cells.num_links(0) != mesh::num_cell_vertices(cell_type))
-  {
-    throw std::runtime_error(
-        "Inconsistent number of cell vertices. Got "
-        + std::to_string(cells.num_links(0)) + ", expected "
-        + std::to_string(mesh::num_cell_vertices(cell_type)) + ".");
-  }
+
+  // if (cells.num_nodes() > 0
+  //     and cells.num_links(0) != mesh::num_cell_vertices(cell_type))
+  // {
+  //   throw std::runtime_error(
+  //       "Inconsistent number of cell vertices. Got "
+  //       + std::to_string(cells.num_links(0)) + ", expected "
+  //       + std::to_string(mesh::num_cell_vertices(cell_type)) + ".");
+  // }
 
   const int mpi_rank = dolfinx::MPI::rank(comm);
 
@@ -434,8 +435,7 @@ mesh::create_topology(MPI_Comm comm,
          == node_remap.end());
   std::for_each(global_to_local_vertices.begin(),
                 global_to_local_vertices.end(),
-                [&remap = std::as_const(node_remap)](auto& v)
-                {
+                [&remap = std::as_const(node_remap)](auto& v) {
                   if (v.second >= 0)
                     v.second = remap[v.second];
                 });
