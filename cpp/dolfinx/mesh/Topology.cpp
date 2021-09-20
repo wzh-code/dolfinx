@@ -150,14 +150,17 @@ std::vector<bool> mesh::compute_boundary_facets(const Topology& topology)
   return _boundary_facet;
 }
 //-----------------------------------------------------------------------------
-Topology::Topology(MPI_Comm comm, mesh::CellType type)
-    : _mpi_comm(comm), _cell_type(type),
-      _connectivity(
-          mesh::cell_dim(type) + 1,
-          std::vector<std::shared_ptr<graph::AdjacencyList<std::int32_t>>>(
-              mesh::cell_dim(type) + 1))
+Topology::Topology(MPI_Comm comm, const std::vector<mesh::CellType>& types)
+    : _mpi_comm(comm), _cell_types(types)
 {
-  // Do nothing
+  assert(types.size() > 0);
+  const int tdim = mesh::cell_dim(types[0]);
+  for (auto t : types)
+    assert(mesh::cell_dim(t) == tdim);
+  _connectivity.resize(
+      tdim + 1,
+      std::vector<std::shared_ptr<graph::AdjacencyList<std::int32_t>>>(tdim
+                                                                       + 1));
 }
 //-----------------------------------------------------------------------------
 int Topology::dim() const noexcept { return _connectivity.size() - 1; }
@@ -285,16 +288,24 @@ const std::vector<std::uint8_t>& Topology::get_facet_permutations() const
   return _facet_permutations;
 }
 //-----------------------------------------------------------------------------
-mesh::CellType Topology::cell_type() const noexcept { return _cell_type; }
+mesh::CellType Topology::cell_type() const
+{
+  LOG(WARNING) << "Topology::cell_type";
+  return _cell_types[0];
+}
+//-----------------------------------------------------------------------------
+const std::vector<mesh::CellType>& Topology::cell_types() const
+{
+  return _cell_types;
+}
 //-----------------------------------------------------------------------------
 MPI_Comm Topology::mpi_comm() const { return _mpi_comm.comm(); }
 //-----------------------------------------------------------------------------
-Topology
-mesh::create_topology(MPI_Comm comm,
-                      const graph::AdjacencyList<std::int64_t>& cells,
-                      const xtl::span<const std::int64_t>& original_cell_index,
-                      const xtl::span<const int>& ghost_owners,
-                      const CellType& cell_type, mesh::GhostMode ghost_mode)
+Topology mesh::create_topology(
+    MPI_Comm comm, const graph::AdjacencyList<std::int64_t>& cells,
+    const xtl::span<const std::int64_t>& original_cell_index,
+    const xtl::span<const int>& ghost_owners,
+    const std::vector<CellType>& cell_type, mesh::GhostMode ghost_mode)
 {
   LOG(INFO) << "Create topology";
 

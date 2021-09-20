@@ -249,7 +249,7 @@ std::pair<std::unique_ptr<DofMap>, std::vector<std::int32_t>> DofMap::collapse(
     // Parent does not have block structure but sub-map does, so build
     // new submap to get block structure for collapsed dofmap.
     auto [index_map, bs, dofmap] = fem::build_dofmap_data(
-        comm, topology, *collapsed_dof_layout, reorder_fn);
+        comm, topology, {}, {*collapsed_dof_layout}, reorder_fn);
     dofmap_new = std::make_unique<DofMap>(element_dof_layout, index_map, bs,
                                           std::move(dofmap), bs);
   }

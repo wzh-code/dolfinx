@@ -32,12 +32,15 @@ graph::AdjacencyList<T>
 reorder_list(const graph::AdjacencyList<T>& list,
              const xtl::span<const std::int32_t>& nodemap)
 {
-  std::vector<T> data(list.array());
-  std::vector<std::int32_t> offsets(list.offsets());
+  std::vector<T> data(list.array().size());
+  std::vector<std::int32_t> offsets(list.offsets().size());
 
   // Compute new offsets
+  offsets[0] = 0;
   for (std::size_t n = 0; n < nodemap.size(); ++n)
-    offsets[n + 1] = offsets[n] + list.num_links(nodemap[n]);
+    offsets[nodemap[n] + 1] = list.num_links(n);
+  std::partial_sum(offsets.begin(), offsets.end(), offsets.begin());
+
   graph::AdjacencyList<T> list_new(std::move(data), std::move(offsets));
 
   for (std::size_t n = 0; n < nodemap.size(); ++n)
@@ -93,6 +96,10 @@ Mesh mesh::create_mesh(MPI_Comm comm,
       = {fem::CoordinateElement(CellType::triangle, 1),
          fem::CoordinateElement(CellType::quadrilateral, 1)};
 
+  std::vector<CellType> element_cell_types;
+  for (auto el : el_types)
+    element_cell_types.push_back(el.cell_shape());
+
   const graph::AdjacencyList<std::int64_t> cells_topology
       = mesh::extract_topology(cell_element_types, el_types, cells);
 
@@ -143,8 +150,12 @@ Mesh mesh::create_mesh(MPI_Comm comm,
 
   // Create re-ordered cell lists
   std::vector<std::int64_t> original_cell_index(original_cell_index0);
+  std::vector<std::uint8_t> cell_element_types1(cell_element_types);
   for (std::size_t i = 0; i < remap.size(); ++i)
+  {
     original_cell_index[remap[i]] = original_cell_index0[i];
+    cell_element_types1[remap[i]] = cell_element_types[i];
+  }
   const graph::AdjacencyList<std::int64_t> cells_extracted
       = reorder_list(cells_extracted0, remap);
   const graph::AdjacencyList<std::int64_t> cell_nodes
@@ -155,9 +166,12 @@ Mesh mesh::create_mesh(MPI_Comm comm,
   // removed later if not required by ghost_mode.
   Topology topology
       = mesh::create_topology(comm, cells_extracted, original_cell_index,
-                              ghost_owners, element.cell_shape(), ghost_mode);
+                              ghost_owners, element_cell_types, ghost_mode);
 
   LOG(INFO) << "Topology OK: " << topology.connectivity(2, 0)->str() << "\n";
+
+  LOG(INFO) << "cell_nodes0 = " << cell_nodes0.str() << "\n";
+  LOG(INFO) << "cell_nodes = " << cell_nodes.str() << "\n";
 
   // Create connectivity required to compute the Geometry (extra
   // connectivities for higher-order geometries)
@@ -192,7 +206,8 @@ Mesh mesh::create_mesh(MPI_Comm comm,
     topology.create_entity_permutations();
 
   return Mesh(comm, std::move(topology),
-              mesh::create_geometry(comm, topology, element, cell_nodes1, x));
+              mesh::create_geometry(comm, topology, cell_element_types1,
+                                    el_types, cell_nodes1, x));
 }
 //-----------------------------------------------------------------------------
 

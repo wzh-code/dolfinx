@@ -26,7 +26,7 @@ void xdmf_mesh::add_topology_data(
 
   const int tdim = topology.dim();
 
-  if (tdim == 2 and topology.cell_type() == mesh::CellType::prism)
+  if (dim == 2 and topology.cell_type() == mesh::CellType::prism)
     throw std::runtime_error("More work needed for prism cell");
 
   // Get entity 'cell' type
@@ -39,8 +39,11 @@ void xdmf_mesh::add_topology_data(
 
   // FIXME: sort out degree/cell type
   // Get VTK string for cell type
+  bool mixed_topology = (dim == tdim and topology.cell_types().size() > 1);
   const std::string vtk_cell_str
-      = xdmf_utils::vtk_cell_type_str(entity_cell_type, num_nodes_per_entity);
+      = mixed_topology ? "Mixed"
+                       : xdmf_utils::vtk_cell_type_str(entity_cell_type,
+                                                       num_nodes_per_entity);
 
   pugi::xml_node topology_node = xml_node.append_child("Topology");
   assert(topology_node);
@@ -55,16 +58,30 @@ void xdmf_mesh::add_topology_data(
   const std::int64_t offset_g = map_g->local_range()[0];
 
   const std::vector<std::int64_t>& ghosts = map_g->ghosts();
-  const std::vector vtk_map = io::cells::transpose(
+  std::vector<std::uint8_t> vtk_map = io::cells::transpose(
       io::cells::perm_vtk(entity_cell_type, num_nodes_per_entity));
   auto map_e = topology.index_map(dim);
   assert(map_e);
+
   if (dim == tdim)
   {
     for (std::int32_t c : active_entities)
     {
       assert(c < cells_g.num_nodes());
       auto nodes = cells_g.links(c);
+
+      // Switch between triangle and quadrilateral
+      int cell_type_code = 5;
+      if (nodes.size() == 3)
+        cell_type_code = 4;
+
+      if (mixed_topology)
+      {
+        topology_data.push_back(cell_type_code);
+        mesh::CellType ct = (nodes.size() == 3) ? mesh::CellType::triangle
+                                                : mesh::CellType::quadrilateral;
+        vtk_map = io::cells::transpose(io::cells::perm_vtk(ct, nodes.size()));
+      }
       for (std::size_t i = 0; i < nodes.size(); ++i)
       {
         std::int64_t global_index = nodes[vtk_map[i]];
@@ -121,20 +138,23 @@ void xdmf_mesh::add_topology_data(
     }
   }
 
-  assert(topology_data.size() % num_nodes_per_entity == 0);
-  const std::int64_t num_entities_local
-      = topology_data.size() / num_nodes_per_entity;
+  // assert(topology_data.size() % num_nodes_per_entity == 0);
+  const std::int64_t num_entities_local = active_entities.size();
   std::int64_t num_entities_global = 0;
   MPI_Allreduce(&num_entities_local, &num_entities_global, 1, MPI_INT64_T,
                 MPI_SUM, comm);
   topology_node.append_attribute("NumberOfElements")
       = std::to_string(num_entities_global).c_str();
-  topology_node.append_attribute("NodesPerElement") = num_nodes_per_entity;
+  if (!mixed_topology)
+    topology_node.append_attribute("NodesPerElement") = num_nodes_per_entity;
 
   // Add topology DataItem node
   const std::string h5_path = path_prefix + "/topology";
-  const std::vector<std::int64_t> shape
-      = {num_entities_global, num_nodes_per_entity};
+  std::vector<std::int64_t> shape;
+  if (mixed_topology)
+    shape = {(std::int64_t)topology_data.size()};
+  else
+    shape = {num_entities_global, num_nodes_per_entity};
   const std::string number_type = "Int";
 
   const std::int64_t num_local = num_entities_local;

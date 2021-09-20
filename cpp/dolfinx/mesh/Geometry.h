@@ -125,7 +125,8 @@ private:
 /// @todo document
 mesh::Geometry
 create_geometry(MPI_Comm comm, const Topology& topology,
-                const fem::CoordinateElement& coordinate_element,
+                const std::vector<std::uint8_t>& cell_layout_type,
+                const std::vector<fem::CoordinateElement>& coordinate_element,
                 const graph::AdjacencyList<std::int64_t>& cells,
                 const xt::xtensor<double, 2>& x,
                 const std::function<std::vector<int>(
