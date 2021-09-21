@@ -201,11 +201,13 @@ build_basic_dofmap(const mesh::Topology& topology,
 
   // Allocate dofmap memory
   const int num_cells = topology.connectivity(D, 0)->num_nodes();
+  LOG(INFO) << "num_cells = " << num_cells
+            << " and cell_layout=" << cell_layout_type.size();
+  assert(num_cells == (int)cell_layout_type.size());
   std::vector<std::int32_t> cell_ptr(num_cells + 1);
   cell_ptr[0] = 0;
   std::transform(cell_layout_type.begin(), cell_layout_type.end(),
                  std::next(cell_ptr.begin(), 1), [&](std::uint8_t t) {
-                   LOG(INFO) << "Cell type = " << (int)t;
                    return element_dof_layout[t].num_dofs();
                  });
   std::partial_sum(cell_ptr.begin(), cell_ptr.end(), cell_ptr.begin());
@@ -237,6 +239,8 @@ build_basic_dofmap(const mesh::Topology& topology,
 
   // Dof -> (dim, entity index) marker
   std::vector<std::pair<std::int8_t, std::int32_t>> dof_entity(local_size);
+
+  LOG(INFO) << "Loop over cells";
 
   // Loops over cells and build dofmaps from ElementDofmaps
   for (int c = 0; c < connectivity[0]->num_nodes(); ++c)
@@ -305,8 +309,14 @@ build_basic_dofmap(const mesh::Topology& topology,
     }
   }
 
+  LOG(INFO) << "Done loop over cells";
+
   graph::AdjacencyList<std::int32_t> dofmap(std::move(dofs),
                                             std::move(cell_ptr));
+
+  LOG(INFO) << "Basic dofmap = " << dofmap.str();
+  LOG(INFO) << "l2g = " << local_to_global.size();
+  LOG(INFO) << "dof_entity=" << dof_entity.size();
 
   return {std::move(dofmap), std::move(local_to_global), std::move(dof_entity)};
 }
@@ -562,6 +572,8 @@ fem::build_dofmap_data(
   // a local dofmap, (ii) local-to-global map for dof indices, and (iii)
   // pair {dimension, mesh entity index} giving the mesh entity that dof
   // i is associated with.
+
+  LOG(INFO) << "cell_layout_type = " << cell_layout_type.size();
 
   // const int num_cells = topology.connectivity(D, 0)->num_nodes();
   const auto [node_graph0, local_to_global0, dof_entity0]

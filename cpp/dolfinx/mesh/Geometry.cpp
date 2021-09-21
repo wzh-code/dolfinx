@@ -62,9 +62,7 @@ mesh::Geometry mesh::create_geometry(
   for (std::size_t i = 0; i < coordinate_element.size(); ++i)
     element_dof_layouts.push_back(coordinate_element[i].dof_layout());
 
-  LOG(INFO) << "x = ";
-  for (auto q : x)
-    LOG(INFO) << q << " ";
+  LOG(INFO) << "Create dofmap " << element_dof_layouts.size();
 
   //  Build 'geometry' dofmap on the topology
   auto [dof_index_map, bs, dofmap] = fem::build_dofmap_data(
@@ -96,6 +94,8 @@ mesh::Geometry mesh::create_geometry(
   xt::xtensor<double, 2> coords
       = graph::build::distribute_data<double>(comm, indices, x);
 
+  LOG(INFO) << "x shape = " << x.shape(0) << "x" << x.shape(1);
+  LOG(INFO) << "Coords shape = " << coords.shape(0) << "x" << coords.shape(1);
   LOG(INFO) << "Cell-nodes = " << cell_nodes.str() << "\n";
 
   // Compute local-to-global map from local indices in dofmap to the

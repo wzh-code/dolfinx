@@ -32,13 +32,18 @@ graph::AdjacencyList<T>
 reorder_list(const graph::AdjacencyList<T>& list,
              const xtl::span<const std::int32_t>& nodemap)
 {
-  std::vector<T> data(list.array().size());
+  // Copies over ghosts
+  std::vector<T> data(list.array());
   std::vector<std::int32_t> offsets(list.offsets().size());
+
+  LOG(INFO) << "reorder_list input = " << list.str();
 
   // Compute new offsets
   offsets[0] = 0;
   for (std::size_t n = 0; n < nodemap.size(); ++n)
     offsets[nodemap[n] + 1] = list.num_links(n);
+  for (std::size_t n = nodemap.size(); n < (std::size_t)list.num_nodes(); ++n)
+    offsets[n + 1] = list.num_links(n);
   std::partial_sum(offsets.begin(), offsets.end(), offsets.begin());
 
   graph::AdjacencyList<T> list_new(std::move(data), std::move(offsets));
@@ -100,6 +105,8 @@ Mesh mesh::create_mesh(MPI_Comm comm,
   for (auto el : el_types)
     element_cell_types.push_back(el.cell_shape());
 
+  LOG(INFO) << "Num cells = " << cells.num_nodes();
+
   const graph::AdjacencyList<std::int64_t> cells_topology
       = mesh::extract_topology(cell_element_types, el_types, cells);
 
@@ -145,6 +152,8 @@ Mesh mesh::create_mesh(MPI_Comm comm,
                                     num_owned_cells + 1),
       tdim);
 
+  LOG(INFO) << "Dual graph = " << g.str();
+
   // Compute re-ordering of local dual graph
   const std::vector<int> remap = graph::scotch::compute_gps(g, 2).first;
 
@@ -156,6 +165,9 @@ Mesh mesh::create_mesh(MPI_Comm comm,
     original_cell_index[remap[i]] = original_cell_index0[i];
     cell_element_types1[remap[i]] = cell_element_types[i];
   }
+
+  LOG(INFO) << "Before reorder_list";
+
   const graph::AdjacencyList<std::int64_t> cells_extracted
       = reorder_list(cells_extracted0, remap);
   const graph::AdjacencyList<std::int64_t> cell_nodes
@@ -202,6 +214,8 @@ Mesh mesh::create_mesh(MPI_Comm comm,
       std::next(cell_nodes.array().begin(), off1[n_cells_local]));
   graph::AdjacencyList<std::int64_t> cell_nodes1(std::move(data1),
                                                  std::move(off1));
+  cell_element_types1.resize(n_cells_local);
+
   if (element.needs_dof_permutations())
     topology.create_entity_permutations();
 

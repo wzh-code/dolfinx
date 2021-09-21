@@ -8,6 +8,7 @@
 
 #include <cassert>
 #include <dolfinx/common/array2d.h>
+#include <dolfinx/common/log.h>
 #include <numeric>
 #include <sstream>
 #include <utility>
@@ -68,6 +69,7 @@ public:
       : _array(std::forward<U>(data)), _offsets(std::forward<V>(offsets))
   {
     _array.reserve(_offsets.back());
+    LOG(INFO) << _array.size() << " off = " << _offsets.back() << "<<<";
     assert(_offsets.back() == (std::int32_t)_array.size());
   }
 

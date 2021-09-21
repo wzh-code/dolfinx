@@ -138,6 +138,8 @@ void xdmf_mesh::add_topology_data(
     }
   }
 
+  LOG(INFO) << "topology_data size=" << topology_data.size();
+
   // assert(topology_data.size() % num_nodes_per_entity == 0);
   const std::int64_t num_entities_local = active_entities.size();
   std::int64_t num_entities_global = 0;
@@ -151,16 +153,23 @@ void xdmf_mesh::add_topology_data(
   // Add topology DataItem node
   const std::string h5_path = path_prefix + "/topology";
   std::vector<std::int64_t> shape;
+  std::int64_t offset = 0;
   if (mixed_topology)
-    shape = {(std::int64_t)topology_data.size()};
+  {
+    std::int64_t num_global = 0;
+    const std::int64_t num_local = topology_data.size();
+    MPI_Allreduce(&num_local, &num_global, 1, MPI_INT64_T, MPI_SUM, comm);
+    MPI_Exscan(&num_local, &offset, 1, MPI_INT64_T, MPI_SUM, comm);
+    shape = {num_global};
+  }
   else
+  {
     shape = {num_entities_global, num_nodes_per_entity};
+    const std::int64_t num_local = num_entities_local;
+    MPI_Exscan(&num_local, &offset, 1, MPI_INT64_T, MPI_SUM, comm);
+  }
   const std::string number_type = "Int";
 
-  const std::int64_t num_local = num_entities_local;
-  std::int64_t offset = 0;
-  MPI_Exscan(&num_local, &offset, 1, dolfinx::MPI::mpi_type<std::int64_t>(),
-             MPI_SUM, comm);
   const bool use_mpi_io = (dolfinx::MPI::size(comm) > 1);
   xdmf_utils::add_data_item(topology_node, h5_id, h5_path, topology_data,
                             offset, shape, number_type, use_mpi_io);
@@ -188,6 +197,7 @@ void xdmf_mesh::add_geometry_data(MPI_Comm comm, pugi::xml_node& xml_node,
   assert(geometry_node);
   assert(gdim > 0 and gdim <= 3);
   const std::string geometry_type = (gdim == 3) ? "XYZ" : "XY";
+  LOG(INFO) << "gdim = " << gdim << " and type = " << geometry_type;
   geometry_node.append_attribute("GeometryType") = geometry_type.c_str();
 
   // Increase 1D to 2D because XDMF has no "X" geometry, use "XY"
