@@ -28,7 +28,7 @@ MeshView::MeshView(const std::shared_ptr<const Mesh> parent_mesh, int dim,
   std::shared_ptr<const graph::AdjacencyList<std::int32_t>> e_to_v
       = parent_topology.connectivity(_dim, 0);
   const CellType entity_type
-      = mesh::cell_entity_type(_parent_mesh->topology().cell_type(), _dim);
+      = mesh::cell_entity_type(_parent_mesh->topology().cell_type(), _dim, 0);
   const int num_vertices_per_entity = mesh::cell_num_entities(entity_type, 0);
   std::vector<std::int32_t> view_vertices;
   view_vertices.reserve(entities.size() * num_vertices_per_entity);
