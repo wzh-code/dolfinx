@@ -29,6 +29,7 @@ std::string common::indent(std::string block)
   return s.str();
 }
 //-----------------------------------------------------------------------------
+// FIXME Remove (we have IndexMap::create_submap)
 std::pair<std::shared_ptr<const IndexMap>, std::vector<std::int64_t>>
 common::compress_index_map(std::shared_ptr<const IndexMap> map,
                            const xtl::span<const std::int32_t>& indices)

@@ -68,8 +68,11 @@ void common(py::module& m)
       .def_property_readonly("local_range",
                              &dolfinx::common::IndexMap::local_range,
                              "Range of indices owned by this map")
-      .def("ghost_owner_rank", &dolfinx::common::IndexMap::ghost_owner_rank,
-           "Return owning process for each ghost index")
+      .def(
+          "ghost_owner_rank",
+          [](const dolfinx::common::IndexMap& self)
+          { return as_pyarray(self.ghost_owner_rank()); },
+          "Return owning process for each ghost index")
       .def_property_readonly(
           "ghosts",
           [](const dolfinx::common::IndexMap& self)
@@ -92,17 +95,12 @@ void common(py::module& m)
                  xtl::span<std::int64_t>(global.mutable_data(), global.size()));
              return global;
            })
-      .def("global_to_local",
+      .def("create_submap",
            [](const dolfinx::common::IndexMap& self,
-              const py::array_t<std::int64_t, py::array::c_style>& global)
+              const py::array_t<std::int32_t, py::array::c_style>& entities)
            {
-             if (global.ndim() != 1)
-               throw std::runtime_error("Array of global indices must be 1D.");
-             py::array_t<std::int32_t> local(global.size());
-             self.global_to_local(
-                 global,
-                 xtl::span<std::int32_t>(local.mutable_data(), local.size()));
-             return local;
+             auto [map, ghosts] = self.create_submap(entities);
+             return std::pair(std::move(map), as_pyarray(std::move(ghosts)));
            });
 
   // dolfinx::common::Timer
@@ -122,6 +120,7 @@ void common(py::module& m)
       .value("user", dolfinx::TimingType::user);
 
   // dolfinx/common free functions
+  // FIXME Remove (we have IndexMap::create_submap)
   m.def(
       "compress_index_map",
       [](std::shared_ptr<const dolfinx::common::IndexMap> index_map,

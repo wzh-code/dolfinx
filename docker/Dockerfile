@@ -47,7 +47,7 @@ ARG PYBIND11_VERSION=2.7.1
 ARG PETSC_VERSION=3.15.2
 ARG SLEPC_VERSION=3.15.1
 ARG ADIOS2_VERSION=2.7.1
-ARG PYVISTA_VERSION=0.31.3
+ARG PYVISTA_VERSION=0.32.1
 ARG NUMPY_VERSION=1.20.3
 ARG KAHIP_VERSION=3.11
 ARG XTENSOR_VERSION=0.23.10
@@ -360,7 +360,7 @@ ONBUILD ARG DOLFINX_CMAKE_CXX_FLAGS
 
 # The dolfinx-onbuild container expects to have folders basix/ ufl/ ffcx/ and
 # dolfinx/ mounted/shared at /src.
-ONBUILD RUN cd basix && cmake -G Ninja -DCMAKE_BUILD_TYPE=${DOLFINX_CMAKE_BUILD_TYPE} -DCMAKE_CXX_FLAGS=${DOLFINX_CMAKE_CXX_FLAGS} -B build-dir -S . && \
+ONBUILD RUN cd basix && cmake -G Ninja -DCMAKE_BUILD_TYPE=${DOLFINX_CMAKE_BUILD_TYPE} -DCMAKE_CXX_FLAGS=${DOLFINX_CMAKE_CXX_FLAGS} -B build-dir -S ./cpp && \
     cmake --build build-dir && \
     cmake --install build-dir && \
     python3 -m pip install ./python && \

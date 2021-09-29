@@ -18,6 +18,7 @@ MeshView::MeshView(const std::shared_ptr<const Mesh> parent_mesh, int dim,
     : _parent_mesh(parent_mesh), _parent_entity_map(), _parent_vertex_map(),
       _dim(dim), _topology()
 {
+  // FIXME Remove dolfinx::common::compress_index_map and replace with IndexMap::create_submap
   _parent_entity_map.reserve(entities.size());
 
   Topology& parent_topology = _parent_mesh->topology_mutable();
