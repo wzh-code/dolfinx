@@ -6,6 +6,7 @@
 
 #include "FiniteElement.h"
 #include <basix/finite-element.h>
+#include <basix/interpolation.h>
 #include <dolfinx/common/log.h>
 #include <functional>
 #include <ufc.h>
@@ -100,6 +101,9 @@ FiniteElement::FiniteElement(const ufc_finite_element& ufc_element)
   case tetrahedron:
     _cell_shape = mesh::CellType::tetrahedron;
     break;
+  case prism:
+    _cell_shape = mesh::CellType::prism;
+    break;
   case hexahedron:
     _cell_shape = mesh::CellType::hexahedron;
     break;
@@ -110,11 +114,9 @@ FiniteElement::FiniteElement(const ufc_finite_element& ufc_element)
   assert(mesh::cell_dim(_cell_shape) == _tdim);
 
   static const std::map<ufc_shape, std::string> ufc_to_cell
-      = {{vertex, "point"},
-         {interval, "interval"},
-         {triangle, "triangle"},
-         {tetrahedron, "tetrahedron"},
-         {quadrilateral, "quadrilateral"},
+      = {{vertex, "point"},         {interval, "interval"},
+         {triangle, "triangle"},    {tetrahedron, "tetrahedron"},
+         {prism, "prism"},          {quadrilateral, "quadrilateral"},
          {hexahedron, "hexahedron"}};
   const std::string cell_shape = ufc_to_cell.at(ufc_element.cell_shape);
 
@@ -143,9 +145,23 @@ FiniteElement::FiniteElement(const ufc_finite_element& ufc_element)
 
   if (is_basix_element(ufc_element))
   {
-    // FIXME: Find a better way than strings to initialise this Basix element
-    _element = std::make_unique<basix::FiniteElement>(basix::create_element(
-        _family.c_str(), cell_shape.c_str(), ufc_element.degree));
+    if (ufc_element.lagrange_variant != -1)
+    {
+      _element = std::make_unique<basix::FiniteElement>(basix::create_element(
+          static_cast<basix::element::family>(ufc_element.basix_family),
+          static_cast<basix::cell::type>(ufc_element.basix_cell),
+          ufc_element.degree,
+          static_cast<basix::element::lagrange_variant>(
+              ufc_element.lagrange_variant),
+          ufc_element.discontinuous));
+    }
+    else
+    {
+      _element = std::make_unique<basix::FiniteElement>(basix::create_element(
+          static_cast<basix::element::family>(ufc_element.basix_family),
+          static_cast<basix::cell::type>(ufc_element.basix_cell),
+          ufc_element.degree, ufc_element.discontinuous));
+    }
 
     _needs_dof_transformations
         = !_element->dof_transformations_are_identity()
@@ -250,6 +266,46 @@ const xt::xtensor<double, 2>& FiniteElement::interpolation_points() const
   return _element->points();
 }
 //-----------------------------------------------------------------------------
+xt::xtensor<double, 2>
+FiniteElement::create_interpolation_operator(const FiniteElement& from) const
+{
+  if (_element->mapping_type() != from._element->mapping_type())
+  {
+    throw std::runtime_error(
+        "Interpolation for elements with different maps is not yet supported.");
+  }
+
+  if (_bs == 1 or from._bs == 1)
+  {
+    // If one of the elements have bs=1, Basix can figure out the size of the
+    // matrix
+    return basix::compute_interpolation_operator(*from._element, *_element);
+  }
+  else if (_bs > 1 and from._bs == _bs)
+  {
+    // If bs != 1 for at least one element, then bs0 == bs1 for this
+    // case
+    xt::xtensor<double, 2> i_m
+        = basix::compute_interpolation_operator(*from._element, *_element);
+    std::array<std::size_t, 2> shape = {i_m.shape(0) * _bs, i_m.shape(1) * _bs};
+    xt::xtensor<double, 2> out = xt::zeros<double>(shape);
+
+    // Alternatively this operation could be implemented during matvec
+    // with the original matrix
+    for (std::size_t i = 0; i < i_m.shape(0); ++i)
+      for (std::size_t j = 0; j < i_m.shape(1); ++j)
+        for (int k = 0; k < _bs; ++k)
+          out(i * _bs + k, j * _bs + k) = i_m(i, j);
+
+    return out;
+  }
+  else
+  {
+    throw std::runtime_error(
+        "Interpolation for element combination is not supported.");
+  }
+}
+//-----------------------------------------------------------------------------
 bool FiniteElement::needs_dof_transformations() const noexcept
 {
   return _needs_dof_transformations;
@@ -278,13 +334,22 @@ FiniteElement::get_dof_permutation_function(bool inverse,
 {
   if (!needs_dof_permutations())
   {
-    // If this element shouldn't be permuted, return a function that
-    // throws an error
-    return [](const xtl::span<std::int32_t>&, std::uint32_t)
+    if (!needs_dof_transformations())
     {
-      throw std::runtime_error(
-          "Permutations should not be applied for this element.");
-    };
+      // If this element shouldn't be permuted, return a function that
+      // does nothing
+      return [](const xtl::span<std::int32_t>&, std::uint32_t) {};
+    }
+    else
+    {
+      // If this element shouldn't be permuted but needs transformations, return
+      // a function that throws an error
+      return [](const xtl::span<std::int32_t>&, std::uint32_t)
+      {
+        throw std::runtime_error(
+            "Permutations should not be applied for this element.");
+      };
+    }
   }
 
   if (_sub_elements.size() != 0)

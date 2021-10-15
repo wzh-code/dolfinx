@@ -17,6 +17,7 @@ import numpy as np
 import ufl
 from dolfinx import cpp
 from dolfinx.fem.function import Function, FunctionSpace
+from petsc4py import PETSc
 
 
 def locate_dofs_geometrical(V: typing.Iterable[typing.Union[cpp.fem.FunctionSpace, FunctionSpace]],
@@ -109,14 +110,15 @@ def locate_dofs_topological(V: typing.Iterable[typing.Union[cpp.fem.FunctionSpac
         return cpp.fem.locate_dofs_topological(_V, entity_dim, _entities, remote)
 
 
-class DirichletBC(cpp.fem.DirichletBC):
+class DirichletBC:
     def __init__(
             self,
-            value: typing.Union[ufl.Coefficient, Function, cpp.fem.Function],
-            dofs: typing.Union[typing.Sequence[int], typing.Tuple[typing.Sequence[int], typing.Sequence[int]]],
-            V: typing.Union[FunctionSpace] = None):
-        """Representation of a Dirichlet boundary condition that is
-        imposed on a linear system.
+            value: typing.Union[ufl.Coefficient, Function],
+            dofs: typing.List[int],
+            V: typing.Union[FunctionSpace] = None,
+            dtype=PETSc.ScalarType):
+        """Representation of Dirichlet boundary condition which is imposed on
+        a linear system.
 
         Parameters
         ----------
@@ -133,6 +135,8 @@ class DirichletBC(cpp.fem.DirichletBC):
             in ``V``.
         V : optional
             Function space of a problem to which boundary conditions are applied.
+        dtype : optional
+            The function scalar type, e.g. ``numpy.float64``.
         """
 
         # Construct bc value
@@ -145,12 +149,52 @@ class DirichletBC(cpp.fem.DirichletBC):
         else:
             raise NotImplementedError
 
+        # Construct bc value
+        if isinstance(value, ufl.Coefficient):
+            _value = value._cpp_object
+        elif isinstance(value, cpp.fem.Function):
+            _value = value
+        elif isinstance(value, Function):
+            _value = value._cpp_object
+        else:
+            raise NotImplementedError
+
+        def dirichletbc_obj(dtype):
+            if dtype is np.float64:
+                return cpp.fem.DirichletBC_float64
+            elif dtype is np.complex128:
+                return cpp.fem.DirichletBC_complex128
+            else:
+                raise NotImplementedError(f"Type {dtype} not supported.")
+
         if V is not None:
             # Extract cpp function space
             try:
                 _V = V._cpp_object
             except AttributeError:
                 _V = V
-            super().__init__(_value, dofs, _V)
+            self._cpp_object = dirichletbc_obj(dtype)(_value, dofs, _V)
         else:
-            super().__init__(_value, dofs)
+            self._cpp_object = dirichletbc_obj(dtype)(_value, dofs)
+
+    @property
+    def function_space(self):
+        """The function space to which boundary condition constrains
+        will be applied"""
+        return self._cpp_object.function_space
+
+
+def bcs_by_block(spaces: typing.Iterable[FunctionSpace],
+                 bcs: typing.Iterable[DirichletBC]) -> typing.Iterable[typing.Iterable[DirichletBC]]:
+    """This function arranges Dirichlet boundary conditions by the
+    function space that they constrain.
+
+    Given a sequence of function spaces `spaces` and a sequence of
+    DirichletBC objects `bcs`, return a list where the ith entry is the
+    list of DirichletBC objects whose space is contained in
+    `space[i]`."""
+    def _bc_space(V, bcs):
+        "Return list of bcs that have the same space as V"
+        return [bc for bc in bcs if V.contains(bc.function_space)]
+
+    return [_bc_space(V, bcs) if V is not None else [] for V in spaces]

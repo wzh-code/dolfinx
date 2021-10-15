@@ -6,7 +6,6 @@
 
 #include "utils.h"
 #include <dolfinx/common/MPI.h>
-#include <dolfinx/common/types.h>
 #include <dolfinx/fem/ElementDofLayout.h>
 #include <dolfinx/mesh/Geometry.h>
 #include <dolfinx/mesh/Mesh.h>
@@ -99,11 +98,16 @@ xt::xtensor<double, 2> create_new_geometry(
     edges[i++] = e.first;
 
   const xt::xtensor<double, 2> midpoints = mesh::midpoints(mesh, 1, edges);
-  xt::view(new_vertex_coordinates, xt::range(-num_new_vertices, _), xt::all())
-      = midpoints;
+  // The below should work, but misbehaves with the Intel icpx compiler
+  // xt::view(new_vertex_coordinates, xt::range(-num_new_vertices, _),
+  // xt::all())
+  //     = midpoints;
+  auto _vertex = xt::view(new_vertex_coordinates,
+                          xt::range(-num_new_vertices, _), xt::all());
+  _vertex.assign(midpoints);
 
-  const std::size_t gdim = mesh.geometry().dim();
-  return xt::view(new_vertex_coordinates, xt::all(), xt::range(0, gdim));
+  return xt::view(new_vertex_coordinates, xt::all(),
+                  xt::range(0, mesh.geometry().dim()));
 }
 } // namespace
 
@@ -286,7 +290,7 @@ std::vector<std::int64_t> refinement::adjust_indices(
   // of "index_map", and adjust existing indices to match.
 
   // Get number of new indices on all processes
-  MPI_Comm comm = index_map->comm(common::IndexMap::Direction::forward);
+  MPI_Comm comm = index_map->comm();
   int mpi_size = dolfinx::MPI::size(comm);
   int mpi_rank = dolfinx::MPI::rank(comm);
   std::vector<std::int32_t> recvn(mpi_size);
@@ -323,8 +327,7 @@ refinement::partition(const mesh::Mesh& old_mesh,
 
   auto partitioner = [](MPI_Comm comm, int, int tdim,
                         const graph::AdjacencyList<std::int64_t>& cell_topology,
-                        mesh::GhostMode)
-  {
+                        mesh::GhostMode) {
     // Find out the ghosting information
     auto [graph, _] = mesh::build_dual_graph(comm, cell_topology, tdim);
 

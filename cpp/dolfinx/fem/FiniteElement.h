@@ -7,12 +7,12 @@
 #pragma once
 
 #include <basix/finite-element.h>
-#include <dolfinx/common/types.h>
 #include <dolfinx/mesh/cell_types.h>
 #include <functional>
 #include <memory>
 #include <numeric>
 #include <vector>
+#include <xtensor/xtensor.hpp>
 #include <xtl/xspan.hpp>
 
 struct ufc_finite_element;
@@ -158,35 +158,29 @@ public:
                                "Cannot interpolate mixed elements directly.");
     }
 
-    const std::size_t rows = _space_dim / _bs;
-    assert(_space_dim % _bs == 0);
-    assert(dofs.size() == rows);
-
-    // Compute dofs = Pi * x (matrix-vector multiply)
-    const xt::xtensor<double, 2>& Pi = _element->interpolation_matrix();
-    assert(Pi.size() % rows == 0);
-    const std::size_t cols = Pi.size() / rows;
-    for (std::size_t i = 0; i < rows; ++i)
-    {
-      // Can be replaced with std::transform_reduce once GCC 8 series dies.
-      // Dot product between row i of the matrix and 'values'
-      dofs[i] = std::inner_product(std::next(Pi.data(), i * cols),
-                                   std::next(Pi.data(), i * cols + cols),
-                                   values.data(), T(0.0));
-    }
+    _element->interpolate(tcb::make_span(dofs), tcb::make_span(values), _bs);
   }
+
+  /// Create a matrix that maps degrees of freedom from one element to
+  /// this element (interpolation)
+  /// @param[in] from The element to interpolate from
+  /// @return Matrix operator that maps the 'from' degrees-of-freedom to
+  /// the degrees-of-freedom of this element.
+  /// @note Does not support mixed elements
+  xt::xtensor<double, 2>
+  create_interpolation_operator(const FiniteElement& from) const;
 
   /// Check if DOF transformations are needed for this element.
   ///
   /// DOF transformations will be needed for elements which might not be
   /// continuous when two neighbouring cells disagree on the orientation of
-  /// a shared subentity, and when this cannot be corrected for by permuting the
-  /// DOF numbering in the dofmap.
+  /// a shared subentity, and when this cannot be corrected for by permuting
+  /// the DOF numbering in the dofmap.
   ///
   /// For example, Raviart-Thomas elements will need DOF transformations,
   /// as the neighbouring cells may disagree on the orientation of a basis
-  /// function, and this orientation cannot be corrected for by permuting the
-  /// DOF numbers on each cell.
+  /// function, and this orientation cannot be corrected for by permuting
+  /// the DOF numbers on each cell.
   ///
   /// @return True if DOF transformations are required
   bool needs_dof_transformations() const noexcept;
@@ -218,7 +212,7 @@ public:
   /// returned
   /// @param[in] transpose Indicates whether the transpose transformations
   /// should be returned
-  /// @param[in] scalar_element Indicated whether the scalar transformations
+  /// @param[in] scalar_element Indicates whether the scalar transformations
   /// should be returned for a vector element
   template <typename T>
   std::function<void(const xtl::span<T>&, const xtl::span<const std::uint32_t>&,
@@ -230,8 +224,7 @@ public:
     {
       // If no permutation needed, return function that does nothing
       return [](const xtl::span<T>&, const xtl::span<const std::uint32_t>&,
-                std::int32_t, int)
-      {
+                std::int32_t, int) {
         // Do nothing
       };
     }
@@ -257,15 +250,14 @@ public:
         return [dims, sub_element_functions](
                    const xtl::span<T>& data,
                    const xtl::span<const std::uint32_t>& cell_info,
-                   std::int32_t cell, int block_size)
-        {
-          std::size_t start = 0;
+                   std::int32_t cell, int block_size) {
+          std::size_t offset = 0;
           for (std::size_t e = 0; e < sub_element_functions.size(); ++e)
           {
             const std::size_t width = dims[e] * block_size;
-            sub_element_functions[e](data.subspan(start, width), cell_info,
+            sub_element_functions[e](data.subspan(offset, width), cell_info,
                                      cell, block_size);
-            start += width;
+            offset += width;
           }
         };
       }
@@ -281,8 +273,9 @@ public:
         return
             [ebs, sub_function](const xtl::span<T>& data,
                                 const xtl::span<const std::uint32_t>& cell_info,
-                                std::int32_t cell, int data_block_size)
-        { sub_function(data, cell_info, cell, ebs * data_block_size); };
+                                std::int32_t cell, int data_block_size) {
+              sub_function(data, cell_info, cell, ebs * data_block_size);
+            };
       }
     }
     if (transpose)
@@ -291,8 +284,7 @@ public:
       {
         return [this](const xtl::span<T>& data,
                       const xtl::span<const std::uint32_t>& cell_info,
-                      std::int32_t cell, int block_size)
-        {
+                      std::int32_t cell, int block_size) {
           apply_inverse_transpose_dof_transformation(data, cell_info[cell],
                                                      block_size);
         };
@@ -320,8 +312,9 @@ public:
       {
         return [this](const xtl::span<T>& data,
                       const xtl::span<const std::uint32_t>& cell_info,
-                      std::int32_t cell, int block_size)
-        { apply_dof_transformation(data, cell_info[cell], block_size); };
+                      std::int32_t cell, int block_size) {
+          apply_dof_transformation(data, cell_info[cell], block_size);
+        };
       }
     }
   }
@@ -353,8 +346,7 @@ public:
     {
       // If no permutation needed, return function that does nothing
       return [](const xtl::span<T>&, const xtl::span<const std::uint32_t>&,
-                std::int32_t, int)
-      {
+                std::int32_t, int) {
         // Do nothing
       };
     }
@@ -377,16 +369,13 @@ public:
         return [this, sub_element_functions](
                    const xtl::span<T>& data,
                    const xtl::span<const std::uint32_t>& cell_info,
-                   std::int32_t cell, int block_size)
-        {
-          std::size_t start = 0;
+                   std::int32_t cell, int block_size) {
+          std::size_t offset = 0;
           for (std::size_t e = 0; e < sub_element_functions.size(); ++e)
           {
-            const std::size_t width
-                = _sub_elements[e]->space_dimension() * block_size;
-            sub_element_functions[e](data.subspan(start, width), cell_info,
-                                     cell, block_size);
-            start += width;
+            sub_element_functions[e](data.subspan(offset, data.size() - offset),
+                                     cell_info, cell, block_size);
+            offset += _sub_elements[e]->space_dimension();
           }
         };
       }
@@ -401,8 +390,7 @@ public:
         return [this,
                 sub_function](const xtl::span<T>& data,
                               const xtl::span<const std::uint32_t>& cell_info,
-                              std::int32_t cell, int data_block_size)
-        {
+                              std::int32_t cell, int data_block_size) {
           const int ebs = block_size();
           const std::size_t dof_count = data.size() / data_block_size;
           for (int block = 0; block < data_block_size; ++block)
@@ -420,8 +408,7 @@ public:
       {
         return [this](const xtl::span<T>& data,
                       const xtl::span<const std::uint32_t>& cell_info,
-                      std::int32_t cell, int block_size)
-        {
+                      std::int32_t cell, int block_size) {
           apply_inverse_transpose_dof_transformation_to_transpose(
               data, cell_info[cell], block_size);
         };
@@ -430,8 +417,7 @@ public:
       {
         return [this](const xtl::span<T>& data,
                       const xtl::span<const std::uint32_t>& cell_info,
-                      std::int32_t cell, int block_size)
-        {
+                      std::int32_t cell, int block_size) {
           apply_transpose_dof_transformation_to_transpose(data, cell_info[cell],
                                                           block_size);
         };
@@ -443,8 +429,7 @@ public:
       {
         return [this](const xtl::span<T>& data,
                       const xtl::span<const std::uint32_t>& cell_info,
-                      std::int32_t cell, int block_size)
-        {
+                      std::int32_t cell, int block_size) {
           apply_inverse_dof_transformation_to_transpose(data, cell_info[cell],
                                                         block_size);
         };

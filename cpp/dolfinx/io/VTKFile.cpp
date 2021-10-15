@@ -77,8 +77,11 @@ std::string get_counter(const pugi::xml_node& node, const std::string& name)
 /// Get the VTK cell type integer
 std::int8_t get_vtk_cell_type(mesh::CellType cell, int dim)
 {
+  if (cell == mesh::CellType::prism and dim == 2)
+    throw std::runtime_error("More work needed for prism cell");
+
   // Get cell type
-  mesh::CellType cell_type = mesh::cell_entity_type(cell, dim);
+  mesh::CellType cell_type = mesh::cell_entity_type(cell, dim, 0);
 
   // Determine VTK cell type (arbitrary Lagrange elements)
   // https://vtk.org/doc/nightly/html/vtkCellType_8h_source.html
@@ -101,14 +104,13 @@ std::int8_t get_vtk_cell_type(mesh::CellType cell, int dim)
   }
 }
 
-/// Convert and Eigen array/matrix to a std::string
+/// Convert an xtensor to a std::string
 template <typename T>
 std::string xt_to_string(const T& x, int precision)
 {
   std::stringstream s;
   s.precision(precision);
-  for (std::uint32_t i = 0; i < x.size(); ++i)
-    s << x[i] << " ";
+  std::for_each(x.begin(), x.end(), [&s](auto e) { s << e << " "; });
   return s.str();
 }
 
@@ -164,7 +166,7 @@ void _add_data(const fem::Function<Scalar>& u,
       field_node.append_attribute("type") = "Float64";
       field_node.append_attribute("Name") = (component + "_" + u.name).c_str();
       field_node.append_attribute("format") = "ascii";
-      xt::xtensor<double, 2> values_comp;
+      xt::xtensor<double, 2> values_comp({values.shape()});
 
       if (component == "real")
         values_comp = xt::real(values);
@@ -175,7 +177,6 @@ void _add_data(const fem::Function<Scalar>& u,
         field_node.append_child(pugi::node_pcdata)
             .set_value(xt_to_string(values_comp, 16).c_str());
       }
-
       else if (rank == 1)
       {
         field_node.append_attribute("NumberOfComponents") = 3;
@@ -511,8 +512,7 @@ void write_function(
         auto cmap = mesh->geometry().cmap();
         auto geometry_layout = cmap.dof_layout();
         // Extract function value
-        const std::vector<Scalar>& func_values = _u.get().x()->array();
-
+        xtl::span<const Scalar> func_values = _u.get().x()->array();
         // Compute in tensor (one for scalar function, . . .)
         const size_t value_size_loc = element->value_size();
 
@@ -526,7 +526,7 @@ void write_function(
         const std::int32_t num_cells = map->size_local();
 
         // Resize array for holding point values
-        xt::xtensor<Scalar, 2> point_values(
+        xt::xtensor<Scalar, 2> point_values = xt::zeros<Scalar>(
             {mesh->geometry().x().shape(0), value_size_loc});
 
         // If scalar function space
