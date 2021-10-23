@@ -364,52 +364,51 @@ void CoordinateElement::pull_back(
   }
   else
   {
-    // xt::xtensor<double, 2> Xk({1, tdim});
-    // std::vector<double> xk(cell_geometry.shape(1));
-    // xt::xtensor<double, 1> dX = xt::empty<double>({tdim});
-    pull_back_nonaffine(X, x, cell_geometry, non_affine_atol,
-                        non_affine_max_its);
-    // for (std::size_t ip = 0; ip < num_points; ++ip)
-    // {
+    xt::xtensor<double, 2> Xk({1, tdim});
+    std::vector<double> xk(cell_geometry.shape(1));
+    xt::xtensor<double, 1> dX = xt::empty<double>({tdim});
+    // pull_back_nonaffine(X, x, cell_geometry, non_affine_atol,
+    //                     non_affine_max_its);
+    for (std::size_t ip = 0; ip < num_points; ++ip)
+    {
+      Xk.fill(0);
+      int k;
+      for (k = 0; k < non_affine_max_its; ++k)
+      {
+        xt::xtensor<double, 4> tabulated_data = _element->tabulate(1, Xk);
+        dphi = xt::view(tabulated_data, xt::range(1, tdim + 1), xt::all(),
+                        xt::all(), xt::all());
 
-    //   Xk.fill(0);
-    //   int k;
-    //   for (k = 0; k < non_affine_max_its; ++k)
-    //   {
-    //     xt::xtensor<double, 4> tabulated_data = _element->tabulate(1, Xk);
-    //     dphi = xt::view(tabulated_data, xt::range(1, tdim + 1), xt::all(),
-    //                     xt::all(), xt::all());
+        // cell_geometry * phi(0)
+        auto phi0 = xt::view(tabulated_data, 0, 0, xt::all(), 0);
+        std::fill(xk.begin(), xk.end(), 0.0);
+        for (std::size_t i = 0; i < cell_geometry.shape(1); ++i)
+          for (std::size_t j = 0; j < cell_geometry.shape(0); ++j)
+            xk[i] += cell_geometry(j, i) * phi0[j];
 
-    //     // cell_geometry * phi(0)
-    //     auto phi0 = xt::view(tabulated_data, 0, 0, xt::all(), 0);
-    //     std::fill(xk.begin(), xk.end(), 0.0);
-    //     for (std::size_t i = 0; i < cell_geometry.shape(1); ++i)
-    //       for (std::size_t j = 0; j < cell_geometry.shape(0); ++j)
-    //         xk[i] += cell_geometry(j, i) * phi0[j];
+        // Compute Jacobian, its inverse and determinant
+        compute_jacobian(dphi, cell_geometry, J);
+        compute_jacobian_inverse(J, K);
+        compute_jacobian_determinant(J, detJ);
 
-    //     // Compute Jacobian, its inverse and determinant
-    //     compute_jacobian(dphi, cell_geometry, J);
-    //     compute_jacobian_inverse(J, K);
-    //     compute_jacobian_determinant(J, detJ);
+        auto K0 = xt::view(K, 0, xt::all(), xt::all());
+        dX.fill(0.0);
+        for (std::size_t i = 0; i < K0.shape(0); ++i)
+          for (std::size_t j = 0; j < K0.shape(1); ++j)
+            dX[i] += K0(i, j) * (x(ip, j) - xk[j]);
 
-    //     auto K0 = xt::view(K, 0, xt::all(), xt::all());
-    //     dX.fill(0.0);
-    //     for (std::size_t i = 0; i < K0.shape(0); ++i)
-    //       for (std::size_t j = 0; j < K0.shape(1); ++j)
-    //         dX[i] += K0(i, j) * (x(ip, j) - xk[j]);
+        if (std::sqrt(xt::sum(dX * dX)()) < non_affine_atol)
+          break;
 
-    //     if (std::sqrt(xt::sum(dX * dX)()) < non_affine_atol)
-    //       break;
-
-    //     Xk += dX;
-    //   }
-    //   xt::row(X, ip) = xt::row(Xk, 0);
-    //   if (k == non_affine_max_its)
-    //   {
-    //     throw std::runtime_error(
-    //         "Newton method failed to converge for non-affine geometry");
-    //   }
-    // }
+        Xk += dX;
+      }
+      xt::row(X, ip) = xt::row(Xk, 0);
+      if (k == non_affine_max_its)
+      {
+        throw std::runtime_error(
+            "Newton method failed to converge for non-affine geometry");
+      }
+    }
   }
 }
 //-----------------------------------------------------------------------------
