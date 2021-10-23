@@ -202,6 +202,94 @@ void CoordinateElement::push_forward(
   math::dot(phi, cell_geometry, x);
 }
 //-----------------------------------------------------------------------------
+void CoordinateElement::pull_back_affine(xt::xtensor<double, 2>& X,
+                                         const xt::xtensor<double, 2>& K,
+                                         const std::array<double, 3>& x0,
+                                         const xt::xtensor<double, 2>& x)
+{
+  assert(X.shape(0) == x.shape(0));
+  assert(X.shape(1) == K.shape(0));
+  assert(x.shape(1) == X.shape(1));
+
+  // Calculate X for each point
+  X.fill(0.0);
+  for (std::size_t p = 0; p < x.shape(0); ++p)
+    for (std::size_t i = 0; i < K.shape(0); ++i)
+      for (std::size_t j = 0; j < K.shape(1); ++j)
+        X(p, i) += K(i, j) * (x(p, j) - x0[j]);
+}
+//-----------------------------------------------------------------------------
+void CoordinateElement::pull_back_nonaffine(
+    xt::xtensor<double, 2>& X, xt::xtensor<double, 3>& J,
+    xt::xtensor<double, 1>& detJ, xt::xtensor<double, 3>& K,
+    const xt::xtensor<double, 2>& x,
+    const xt::xtensor<double, 2>& cell_geometry, double tol, int maxit) const
+{
+  // Number of points
+  std::size_t num_points = x.shape(0);
+  if (num_points == 0)
+    return;
+
+  // in-argument checks
+  const std::size_t tdim = this->topological_dimension();
+  const std::size_t gdim = x.shape(1);
+  const std::size_t d = cell_geometry.shape(0);
+  assert(cell_geometry.shape(1) == gdim);
+
+  // In/out size checks
+  assert(X.shape(0) == num_points);
+  assert(X.shape(1) == tdim);
+  assert(J.size() == num_points * gdim * tdim);
+  assert(detJ.size() == num_points);
+  assert(K.size() == num_points * gdim * tdim);
+
+  xt::xtensor<double, 4> dphi({tdim, num_points, d, 1});
+  xt::xtensor<double, 2> Xk({1, tdim});
+  std::vector<double> xk(cell_geometry.shape(1));
+  xt::xtensor<double, 1> dX = xt::empty<double>({tdim});
+  for (std::size_t ip = 0; ip < num_points; ++ip)
+  {
+    Xk.fill(0);
+    int k;
+    for (k = 0; k < maxit; ++k)
+    {
+      xt::xtensor<double, 4> tabulated_data = _element->tabulate(1, Xk);
+      dphi = xt::view(tabulated_data, xt::range(1, tdim + 1), xt::all(),
+                      xt::all(), xt::all());
+
+      // cell_geometry * phi(0)
+      auto phi0 = xt::view(tabulated_data, 0, 0, xt::all(), 0);
+      std::fill(xk.begin(), xk.end(), 0.0);
+      for (std::size_t i = 0; i < cell_geometry.shape(1); ++i)
+        for (std::size_t j = 0; j < cell_geometry.shape(0); ++j)
+          xk[i] += cell_geometry(j, i) * phi0[j];
+
+      // Compute Jacobian, its inverse and determinant
+      compute_jacobian(dphi, cell_geometry, J);
+      compute_jacobian_inverse(J, K);
+      compute_jacobian_determinant(J, detJ);
+
+      auto K0 = xt::view(K, 0, xt::all(), xt::all());
+      dX.fill(0.0);
+      for (std::size_t i = 0; i < K0.shape(0); ++i)
+        for (std::size_t j = 0; j < K0.shape(1); ++j)
+          dX[i] += K0(i, j) * (x(ip, j) - xk[j]);
+
+      if (std::sqrt(xt::sum(dX * dX)()) < tol)
+        break;
+
+      Xk += dX;
+    }
+    xt::row(X, ip) = xt::row(Xk, 0);
+
+    if (k == maxit)
+    {
+      throw std::runtime_error(
+          "Newton method failed to converge for non-affine geometry");
+    }
+  }
+}
+//-----------------------------------------------------------------------------
 void CoordinateElement::pull_back(
     xt::xtensor<double, 2>& X, xt::xtensor<double, 3>& J,
     xt::xtensor<double, 1>& detJ, xt::xtensor<double, 3>& K,
@@ -242,20 +330,16 @@ void CoordinateElement::pull_back(
 
     // Compute physical coordinates at X=0 (phi(X) * cell_geom).
     auto phi0 = xt::view(tabulated_data, 0, 0, xt::all(), 0);
-    std::vector<double> x0(cell_geometry.shape(1), 0.0);
+    std::array<double, 3> x0 = {0, 0, 0};
     for (std::size_t i = 0; i < x.size(); ++i)
       for (std::size_t j = 0; j < phi0.shape(0); ++j)
         x0[i] += cell_geometry(j, i) * phi0[j];
 
     // Calculate X for each point
     auto K0 = xt::view(K, 0, xt::all(), xt::all());
+
     X.fill(0.0);
-    for (std::size_t ip = 0; ip < num_points; ++ip)
-    {
-      for (std::size_t i = 0; i < K0.shape(0); ++i)
-        for (std::size_t j = 0; j < K0.shape(1); ++j)
-          X(ip, i) += K0(i, j) * (x(ip, j) - x0[j]);
-    }
+    pull_back_affine(X, K0, x0, x);
   }
   else
   {
