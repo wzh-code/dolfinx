@@ -118,6 +118,14 @@ void CoordinateElement::compute_jacobian(
   }
 }
 //--------------------------------------------------------------------------------
+void CoordinateElement::compute_jacobian(
+    const xt::xtensor<double, 3>& dphi, const xt::xtensor<double, 2>& cell_geom,
+    xt::xtensor<double, 2>& J) const
+{
+  J.fill(0);
+  math::dot(cell_geom, dphi, J, true);
+}
+//--------------------------------------------------------------------------------
 void CoordinateElement::compute_jacobian_inverse(
     const xt::xtensor<double, 3>& J, xt::xtensor<double, 3>& K) const
 {
@@ -156,6 +164,17 @@ void CoordinateElement::compute_jacobian_inverse(
       K_ip.assign(K0);
     }
   }
+}
+//--------------------------------------------------------------------------------
+void CoordinateElement::compute_jacobian_inverse(
+    const xt::xtensor<double, 2>& J, xt::xtensor<double, 2>& K) const
+{
+  const int gdim = J.shape(0);
+  const int tdim = K.shape(0);
+  if (gdim == tdim)
+    math::inv(J, K);
+  else
+    math::pinv(J, K);
 }
 //--------------------------------------------------------------------------------
 void CoordinateElement::compute_jacobian_determinant(
@@ -220,9 +239,7 @@ void CoordinateElement::pull_back_affine(xt::xtensor<double, 2>& X,
 }
 //-----------------------------------------------------------------------------
 void CoordinateElement::pull_back_nonaffine(
-    xt::xtensor<double, 2>& X, xt::xtensor<double, 3>& J,
-    xt::xtensor<double, 1>& detJ, xt::xtensor<double, 3>& K,
-    const xt::xtensor<double, 2>& x,
+    xt::xtensor<double, 2>& X, const xt::xtensor<double, 2>& x,
     const xt::xtensor<double, 2>& cell_geometry, double tol, int maxit) const
 {
   // Number of points
@@ -239,41 +256,46 @@ void CoordinateElement::pull_back_nonaffine(
   // In/out size checks
   assert(X.shape(0) == num_points);
   assert(X.shape(1) == tdim);
-  assert(J.size() == num_points * gdim * tdim);
-  assert(detJ.size() == num_points);
-  assert(K.size() == num_points * gdim * tdim);
+  // assert(J.size() == num_points * gdim * tdim);
+  // assert(K.size() == num_points * gdim * tdim);
 
   xt::xtensor<double, 4> dphi({tdim, num_points, d, 1});
   xt::xtensor<double, 2> Xk({1, tdim});
   std::vector<double> xk(cell_geometry.shape(1));
   xt::xtensor<double, 1> dX = xt::empty<double>({tdim});
+
+  xt::xtensor<double, 2> J({gdim, tdim});
+  xt::xtensor<double, 2> K({tdim, gdim});
+
   for (std::size_t ip = 0; ip < num_points; ++ip)
   {
     Xk.fill(0);
     int k;
     for (k = 0; k < maxit; ++k)
     {
-      xt::xtensor<double, 4> tabulated_data = _element->tabulate(1, Xk);
-      dphi = xt::view(tabulated_data, xt::range(1, tdim + 1), xt::all(),
-                      xt::all(), xt::all());
+      // Compute phi and dphi at point X_k
+      xt::xtensor<double, 4> basis = _element->tabulate(1, Xk);
 
-      // cell_geometry * phi(0)
-      auto phi0 = xt::view(tabulated_data, 0, 0, xt::all(), 0);
+      // Compute physical coordinated x_k for referebce point X_k
+      // (cell_geometry * phi(0))
+      auto phi0 = xt::view(basis, 0, 0, xt::all(), 0);
       std::fill(xk.begin(), xk.end(), 0.0);
       for (std::size_t i = 0; i < cell_geometry.shape(1); ++i)
         for (std::size_t j = 0; j < cell_geometry.shape(0); ++j)
           xk[i] += cell_geometry(j, i) * phi0[j];
 
-      // Compute Jacobian, its inverse and determinant
+      // Extract dphi for point X_k
+      dphi = xt::view(basis, xt::range(1, tdim + 1), xt::all(), xt::all(),
+                      xt::all());
+
+      // Compute Jacobian and its inverse at X_k
       compute_jacobian(dphi, cell_geometry, J);
       compute_jacobian_inverse(J, K);
-      compute_jacobian_determinant(J, detJ);
 
-      auto K0 = xt::view(K, 0, xt::all(), xt::all());
       dX.fill(0.0);
-      for (std::size_t i = 0; i < K0.shape(0); ++i)
-        for (std::size_t j = 0; j < K0.shape(1); ++j)
-          dX[i] += K0(i, j) * (x(ip, j) - xk[j]);
+      for (std::size_t i = 0; i < K.shape(0); ++i)
+        for (std::size_t j = 0; j < K.shape(1); ++j)
+          dX[i] += K(i, j) * (x(ip, j) - xk[j]);
 
       if (std::sqrt(xt::sum(dX * dX)()) < tol)
         break;

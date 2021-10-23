@@ -69,6 +69,10 @@ public:
                         const xt::xtensor<double, 2>& cell_geometry,
                         xt::xtensor<double, 3>& J) const;
 
+  /// NEW
+  void compute_jacobian(const xt::xtensor<double, 3>& dphi,
+                        const xt::xtensor<double, 2>& cell_geometry,
+                        xt::xtensor<double, 2>& J) const;
   /// Compute the inverse of the Jacobian. If the coordinate element is
   /// affine, it computes the inverse at only one point.
   /// @param[in] J The Jacobian
@@ -78,6 +82,10 @@ public:
   /// (number of points, tpological dimension, geometrical dimenson).
   void compute_jacobian_inverse(const xt::xtensor<double, 3>& J,
                                 xt::xtensor<double, 3>& K) const;
+
+  /// New
+  void compute_jacobian_inverse(const xt::xtensor<double, 2>& J,
+                                xt::xtensor<double, 2>& K) const;
 
   /// Compute the determinant of the Jacobian. If the coordinate element
   /// is affine, it computes the determinant at only one point.
@@ -116,9 +124,7 @@ public:
 
   /// Compute reference coordinates X for physical coordinates x for a
   /// non-affine map.
-  void pull_back_nonaffine(xt::xtensor<double, 2>& X, xt::xtensor<double, 3>& J,
-                           xt::xtensor<double, 1>& detJ,
-                           xt::xtensor<double, 3>& K,
+  void pull_back_nonaffine(xt::xtensor<double, 2>& X,
                            const xt::xtensor<double, 2>& x,
                            const xt::xtensor<double, 2>& cell_geometry,
                            double tol = 1.0e-8, int maxit = 10) const;
