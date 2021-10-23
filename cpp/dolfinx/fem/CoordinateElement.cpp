@@ -119,7 +119,7 @@ void CoordinateElement::compute_jacobian(
 }
 //--------------------------------------------------------------------------------
 void CoordinateElement::compute_jacobian(
-    const xt::xtensor<double, 3>& dphi, const xt::xtensor<double, 2>& cell_geom,
+    const xt::xtensor<double, 2>& dphi, const xt::xtensor<double, 2>& cell_geom,
     xt::xtensor<double, 2>& J) const
 {
   J.fill(0);
@@ -259,7 +259,7 @@ void CoordinateElement::pull_back_nonaffine(
   // assert(J.size() == num_points * gdim * tdim);
   // assert(K.size() == num_points * gdim * tdim);
 
-  xt::xtensor<double, 4> dphi({tdim, num_points, d, 1});
+  xt::xtensor<double, 2> dphi({tdim, d});
   xt::xtensor<double, 2> Xk({1, tdim});
   std::vector<double> xk(cell_geometry.shape(1));
   xt::xtensor<double, 1> dX = xt::empty<double>({tdim});
@@ -285,8 +285,7 @@ void CoordinateElement::pull_back_nonaffine(
           xk[i] += cell_geometry(j, i) * phi0[j];
 
       // Extract dphi for point X_k
-      dphi = xt::view(basis, xt::range(1, tdim + 1), xt::all(), xt::all(),
-                      xt::all());
+      dphi = xt::view(basis, xt::range(1, tdim + 1), ip, xt::all(), 0);
 
       // Compute Jacobian and its inverse at X_k
       compute_jacobian(dphi, cell_geometry, J);

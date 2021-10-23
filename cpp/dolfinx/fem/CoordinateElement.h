@@ -70,7 +70,7 @@ public:
                         xt::xtensor<double, 3>& J) const;
 
   /// NEW
-  void compute_jacobian(const xt::xtensor<double, 3>& dphi,
+  void compute_jacobian(const xt::xtensor<double, 2>& dphi,
                         const xt::xtensor<double, 2>& cell_geometry,
                         xt::xtensor<double, 2>& J) const;
   /// Compute the inverse of the Jacobian. If the coordinate element is
