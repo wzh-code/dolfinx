@@ -10,7 +10,6 @@
 #include <dolfinx/mesh/cell_types.h>
 #include <functional>
 #include <memory>
-#include <numeric>
 #include <vector>
 #include <xtensor/xtensor.hpp>
 #include <xtl/xspan.hpp>
@@ -45,13 +44,18 @@ public:
 
   /// String identifying the finite element
   /// @return Element signature
+  /// @note The function is provided for convenience, but it should not
+  /// be relied upon for determining the element type. Use other
+  /// functions, commonly returning enums, to determine element
+  /// properties.
   std::string signature() const noexcept;
 
   /// Cell shape
   /// @return Element cell shape
   mesh::CellType cell_shape() const noexcept;
 
-  /// Dimension of the finite element function space
+  /// Dimension of the finite element function space (the number of
+  /// degrees-of-freedom for the element)
   /// @return Dimension of the finite element space
   int space_dimension() const noexcept;
 
@@ -94,15 +98,31 @@ public:
                 int order) const;
 
   /// Push basis functions forward to physical element
-  void transform_reference_basis(xt::xtensor<double, 3>& values,
-                                 const xt::xtensor<double, 3>& reference_values,
-                                 const xt::xtensor<double, 3>& J,
-                                 const xtl::span<const double>& detJ,
-                                 const xt::xtensor<double, 3>& K) const;
+  /// @param[out] values Basis function values on the physical domain (ndim=3)
+  /// @param[in] reference_values Basis function values on the reference
+  /// cell (ndim=3)
+  /// @param[in] J The Jacobian of the map (shape=(num_points, gdim, tdim))
+  /// @param[in] detJ The determinant of the Jacobian
+  /// @param[in] K The inverse of the Jacobian (shape=(num_points, tdim, gdim))
+  template <typename U, typename V, typename W, typename X>
+  constexpr void
+  transform_reference_basis(U&& values, const V& reference_values, const W& J,
+                            const xtl::span<const double>& detJ,
+                            const X& K) const
+  {
+    assert(_element);
+    _element->map_push_forward_m(reference_values, J, detJ, K, values);
+  }
 
-  /// Get the number of sub elements (for a mixed element)
-  /// @return the Number of sub elements
+  /// Get the number of sub elements (for a mixed or blocked element)
+  /// @return The number of sub elements
   int num_sub_elements() const noexcept;
+
+  /// Check if element is a mixed element, i.e. composed of two or more
+  /// elements of different types. A block element, e.g. a Lagrange
+  /// element with block size > 1 is not considered mixed.
+  /// @return True is element is mixed.
+  bool is_mixed() const noexcept;
 
   /// Subelements (if any)
   const std::vector<std::shared_ptr<const FiniteElement>>&
@@ -135,7 +155,7 @@ public:
   /// @todo Make the interpolating dofs in/out argument for efficiency
   /// as this function is often called from within tight loops
   /// @todo Consider handling block size > 1
-  /// @todo Re-work for fields that require a pull-back, e.g. Piols
+  /// @todo Re-work for fields that require a pull-back, e.g. Piola
   /// mapped elements
   ///
   /// Interpolate a function in the finite element space on a cell.
@@ -150,7 +170,7 @@ public:
   /// the expression. The call must allocate the space. Is has
   template <typename T>
   constexpr void interpolate(const xt::xtensor<T, 2>& values,
-                             xtl::span<T> dofs) const
+                             const xtl::span<T>& dofs) const
   {
     if (!_element)
     {
@@ -158,7 +178,7 @@ public:
                                "Cannot interpolate mixed elements directly.");
     }
 
-    _element->interpolate(tcb::make_span(dofs), tcb::make_span(values), _bs);
+    _element->interpolate(dofs, tcb::make_span(values), _bs);
   }
 
   /// Create a matrix that maps degrees of freedom from one element to
@@ -224,7 +244,8 @@ public:
     {
       // If no permutation needed, return function that does nothing
       return [](const xtl::span<T>&, const xtl::span<const std::uint32_t>&,
-                std::int32_t, int) {
+                std::int32_t, int)
+      {
         // Do nothing
       };
     }
@@ -250,7 +271,8 @@ public:
         return [dims, sub_element_functions](
                    const xtl::span<T>& data,
                    const xtl::span<const std::uint32_t>& cell_info,
-                   std::int32_t cell, int block_size) {
+                   std::int32_t cell, int block_size)
+        {
           std::size_t offset = 0;
           for (std::size_t e = 0; e < sub_element_functions.size(); ++e)
           {
@@ -273,9 +295,8 @@ public:
         return
             [ebs, sub_function](const xtl::span<T>& data,
                                 const xtl::span<const std::uint32_t>& cell_info,
-                                std::int32_t cell, int data_block_size) {
-              sub_function(data, cell_info, cell, ebs * data_block_size);
-            };
+                                std::int32_t cell, int data_block_size)
+        { sub_function(data, cell_info, cell, ebs * data_block_size); };
       }
     }
     if (transpose)
@@ -284,7 +305,8 @@ public:
       {
         return [this](const xtl::span<T>& data,
                       const xtl::span<const std::uint32_t>& cell_info,
-                      std::int32_t cell, int block_size) {
+                      std::int32_t cell, int block_size)
+        {
           apply_inverse_transpose_dof_transformation(data, cell_info[cell],
                                                      block_size);
         };
@@ -312,9 +334,8 @@ public:
       {
         return [this](const xtl::span<T>& data,
                       const xtl::span<const std::uint32_t>& cell_info,
-                      std::int32_t cell, int block_size) {
-          apply_dof_transformation(data, cell_info[cell], block_size);
-        };
+                      std::int32_t cell, int block_size)
+        { apply_dof_transformation(data, cell_info[cell], block_size); };
       }
     }
   }
@@ -346,7 +367,8 @@ public:
     {
       // If no permutation needed, return function that does nothing
       return [](const xtl::span<T>&, const xtl::span<const std::uint32_t>&,
-                std::int32_t, int) {
+                std::int32_t, int)
+      {
         // Do nothing
       };
     }
@@ -369,7 +391,8 @@ public:
         return [this, sub_element_functions](
                    const xtl::span<T>& data,
                    const xtl::span<const std::uint32_t>& cell_info,
-                   std::int32_t cell, int block_size) {
+                   std::int32_t cell, int block_size)
+        {
           std::size_t offset = 0;
           for (std::size_t e = 0; e < sub_element_functions.size(); ++e)
           {
@@ -390,7 +413,8 @@ public:
         return [this,
                 sub_function](const xtl::span<T>& data,
                               const xtl::span<const std::uint32_t>& cell_info,
-                              std::int32_t cell, int data_block_size) {
+                              std::int32_t cell, int data_block_size)
+        {
           const int ebs = block_size();
           const std::size_t dof_count = data.size() / data_block_size;
           for (int block = 0; block < data_block_size; ++block)
@@ -408,7 +432,8 @@ public:
       {
         return [this](const xtl::span<T>& data,
                       const xtl::span<const std::uint32_t>& cell_info,
-                      std::int32_t cell, int block_size) {
+                      std::int32_t cell, int block_size)
+        {
           apply_inverse_transpose_dof_transformation_to_transpose(
               data, cell_info[cell], block_size);
         };
@@ -417,7 +442,8 @@ public:
       {
         return [this](const xtl::span<T>& data,
                       const xtl::span<const std::uint32_t>& cell_info,
-                      std::int32_t cell, int block_size) {
+                      std::int32_t cell, int block_size)
+        {
           apply_transpose_dof_transformation_to_transpose(data, cell_info[cell],
                                                           block_size);
         };
@@ -429,7 +455,8 @@ public:
       {
         return [this](const xtl::span<T>& data,
                       const xtl::span<const std::uint32_t>& cell_info,
-                      std::int32_t cell, int block_size) {
+                      std::int32_t cell, int block_size)
+        {
           apply_inverse_dof_transformation_to_transpose(data, cell_info[cell],
                                                         block_size);
         };
@@ -446,7 +473,7 @@ public:
     }
   }
 
-  /// Apply DOF transformation to some data.
+  /// Apply DOF transformation to some data
   ///
   /// @param[in,out] data The data to be transformed
   /// @param[in] cell_permutation Permutation data for the cell

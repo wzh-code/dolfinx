@@ -64,8 +64,13 @@ void declare_functions(py::module& m)
       [](dolfinx::fem::Form<T>& form)
       {
         auto [coeffs, cstride] = dolfinx::fem::pack_coefficients(form);
-        int shape0 = cstride == 0 ? 0 : coeffs.size() / cstride;
-        return as_pyarray(std::move(coeffs), std::array{shape0, cstride});
+        std::shared_ptr<const mesh::Mesh> mesh = form.mesh();
+        assert(mesh);
+        const int tdim = mesh->topology().dim();
+        const std::int32_t num_cells
+            = mesh->topology().index_map(tdim)->size_local()
+              + mesh->topology().index_map(tdim)->num_ghosts();
+        return as_pyarray(std::move(coeffs), std::array{num_cells, cstride});
       },
       "Pack coefficients for a Form.");
   m.def(
@@ -73,8 +78,13 @@ void declare_functions(py::module& m)
       [](dolfinx::fem::Expression<T>& e)
       {
         auto [coeffs, cstride] = dolfinx::fem::pack_coefficients(e);
-        int shape0 = cstride == 0 ? 0 : coeffs.size() / cstride;
-        return as_pyarray(std::move(coeffs), std::array{shape0, cstride});
+        std::shared_ptr<const mesh::Mesh> mesh = e.mesh();
+        assert(mesh);
+        const int tdim = mesh->topology().dim();
+        const std::int32_t num_cells
+            = mesh->topology().index_map(tdim)->size_local()
+              + mesh->topology().index_map(tdim)->num_ghosts();
+        return as_pyarray(std::move(coeffs), std::array{num_cells, cstride});
       },
       "Pack coefficients for an Expression.");
   m.def(
@@ -497,6 +507,8 @@ void declare_form(py::module& m, const std::string& type)
       .def_property_readonly("function_spaces",
                              &dolfinx::fem::Form<T>::function_spaces)
       .def("integral_ids", &dolfinx::fem::Form<T>::integral_ids)
+      .def_property_readonly("integral_types",
+                             &dolfinx::fem::Form<T>::integral_types)
       .def_property_readonly("needs_facet_permutations",
                              &dolfinx::fem::Form<T>::needs_facet_permutations)
       .def(
@@ -638,7 +650,7 @@ void fem(py::module& m)
             comm.get(), topology, element_dof_layout,
             [](const dolfinx::graph::AdjacencyList<std::int32_t>& g)
             { return dolfinx::graph::scotch::compute_gps(g, 2).first; });
-        return std::tuple(map, bs, std::move(dofmap));
+        return std::tuple(std::move(map), bs, std::move(dofmap));
       },
       "Build and dofmap on a mesh.");
   m.def("transpose_dofmap", &dolfinx::fem::transpose_dofmap,
@@ -734,8 +746,7 @@ void fem(py::module& m)
       m, "CoordinateElement", "Coordinate map element")
       .def(py::init<dolfinx::mesh::CellType, int>(), py::arg("celltype"),
            py::arg("degree"))
-      .def_property_readonly("dof_layout",
-                             &dolfinx::fem::CoordinateElement::dof_layout)
+      .def("create_dof_layout", &dolfinx::fem::CoordinateElement::create_dof_layout)
       .def("push_forward",
            [](const dolfinx::fem::CoordinateElement& self,
               const py::array_t<double, py::array::c_style>& X,
@@ -763,15 +774,10 @@ void fem(py::module& m)
               const py::array_t<double, py::array::c_style>& x,
               const py::array_t<double, py::array::c_style>& cell_geometry)
            {
-             const std::size_t tdim = self.topological_dimension();
-             const std::size_t gdim = x.shape(1);
              const std::size_t num_points = x.shape(0);
+             const std::size_t gdim = x.shape(1);
+             const std::size_t tdim = self.topological_dimension();
              xt::xtensor<double, 2> X = xt::empty<double>({num_points, tdim});
-             xt::xtensor<double, 3> J
-                 = xt::empty<double>({num_points, gdim, tdim});
-             xt::xtensor<double, 3> K
-                 = xt::empty<double>({num_points, tdim, gdim});
-             xt::xtensor<double, 1> detJ = xt::empty<double>({num_points});
 
              std::array<std::size_t, 2> s_x;
              std::copy_n(x.shape(), 2, s_x.begin());
@@ -781,13 +787,26 @@ void fem(py::module& m)
              std::copy_n(cell_geometry.shape(), 2, s_g.begin());
              auto g = xt::adapt(cell_geometry.data(), cell_geometry.size(),
                                 xt::no_ownership(), s_g);
-             self.pull_back(X, J, detJ, K, _x, g);
+
+             if (self.is_affine())
+             {
+               xt::xtensor<double, 2> J = xt::zeros<double>({gdim, tdim});
+               xt::xtensor<double, 2> K = xt::zeros<double>({tdim, gdim});
+               xt::xtensor<double, 4> data(self.tabulate_shape(1, 1));
+               const xt::xtensor<double, 2> X0
+                   = xt::zeros<double>({std::size_t(1), tdim});
+               self.tabulate(1, X0, data);
+               xt::xtensor<double, 2> dphi
+                   = xt::view(data, xt::range(1, tdim + 1), 0, xt::all(), 0);
+               self.compute_jacobian(dphi, g, J);
+               self.compute_jacobian_inverse(J, K);
+               self.pull_back_affine(X, K, self.x0(g), _x);
+             }
+             else
+               self.pull_back_nonaffine(X, _x, g);
+
              return xt_as_pyarray(std::move(X));
-           })
-      .def_readwrite("non_affine_atol",
-                     &dolfinx::fem::CoordinateElement::non_affine_atol)
-      .def_readwrite("non_affine_max_its",
-                     &dolfinx::fem::CoordinateElement::non_affine_max_its);
+           });
 
   // dolfinx::fem::assemble
   declare_functions<double>(m);
