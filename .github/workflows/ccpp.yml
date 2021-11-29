@@ -51,7 +51,7 @@ jobs:
           python3 -m flake8 test
 
       - name: Configure C++
-        run: cmake -G Ninja -DCMAKE_BUILD_TYPE=Developer -B build -S cpp/
+        run: cmake -G Ninja -DCMAKE_BUILD_TYPE=Developer -DDDOLFINx_ENABLE_KAHIP=on -B build -S cpp/
 
       - name: Build and install C++ library
         run: |
