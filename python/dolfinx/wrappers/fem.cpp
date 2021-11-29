@@ -483,7 +483,8 @@ void declare_form(py::module& m, const std::string& type)
                  const std::vector<std::shared_ptr<
                      const dolfinx::fem::Constant<T>>>& constants,
                  bool needs_permutation_data,
-                 const std::shared_ptr<const dolfinx::mesh::Mesh>& mesh)
+                 const std::shared_ptr<const dolfinx::mesh::Mesh>& mesh,
+                 const std::shared_ptr<const dolfinx::mesh::Mesh>& facet_mesh)
               {
                 using kern
                     = std::function<void(T*, const T*, const T*, const double*,
@@ -512,11 +513,11 @@ void declare_form(py::module& m, const std::string& type)
                 }
                 return dolfinx::fem::Form<T>(spaces, _integrals, coefficients,
                                              constants, needs_permutation_data,
-                                             mesh);
+                                             mesh, facet_mesh);
               }),
           py::arg("spaces"), py::arg("integrals"), py::arg("coefficients"),
           py::arg("constants"), py::arg("need_permutation_data"),
-          py::arg("mesh") = py::none())
+          py::arg("mesh") = py::none(), py::arg("facet_mesh") = py::none())
       .def_property_readonly("coefficients",
                              &dolfinx::fem::Form<T>::coefficients)
       .def_property_readonly("rank", &dolfinx::fem::Form<T>::rank)
