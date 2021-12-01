@@ -83,9 +83,10 @@ xt::xtensor<std::int64_t, 2> extract_vtk_connectivity(const mesh::Mesh& mesh)
   // Get DOLFINx to VTK permutation
   // FIXME: Use better way to get number of nodes
   const graph::AdjacencyList<std::int32_t>& dofmap_x = mesh.geometry().dofmap();
+  const int degree = mesh.geometry().cmap().degree();
   const std::size_t num_nodes = dofmap_x.num_links(0);
   std::vector map = dolfinx::io::cells::transpose(
-      dolfinx::io::cells::perm_vtk(mesh.topology().cell_type(), num_nodes));
+      dolfinx::io::cells::perm_vtk(mesh.topology().cell_type(), degree));
   // TODO: Remove when when paraview issue 19433 is resolved
   // (https://gitlab.kitware.com/paraview/paraview/issues/19433)
   if (mesh.topology().cell_type() == dolfinx::mesh::CellType::hexahedron
@@ -345,8 +346,9 @@ void vtx_write_mesh_from_space(adios2::IO& io, adios2::Engine& engine,
   std::shared_ptr<const fem::DofMap> dofmap = V.dofmap();
   assert(dofmap);
   const std::uint32_t num_nodes = dofmap->cell_dofs(0).size();
+  const int degree = geometry.cmap().degree();
   std::vector<std::uint8_t> map = dolfinx::io::cells::transpose(
-      io::cells::perm_vtk(mesh->topology().cell_type(), num_nodes));
+      io::cells::perm_vtk(mesh->topology().cell_type(), dedgree));
 
   // Extract topology for all local cells as
   // [N0, v0_0, ...., v0_N0, N1, v1_0, ...., v1_N1, ....]

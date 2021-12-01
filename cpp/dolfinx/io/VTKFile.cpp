@@ -341,9 +341,10 @@ void add_mesh(const mesh::Mesh& mesh, pugi::xml_node& piece_node)
 
   // Get map from VTK index i to DOLFIN index j
   int num_nodes = geometry.cmap().create_dof_layout().num_dofs();
+  int degree = geometry.cmap().degree();
 
-  std::vector<std::uint8_t> map = io::cells::transpose(
-      io::cells::perm_vtk(topology.cell_type(), num_nodes));
+  std::vector<std::uint8_t> map
+      = io::cells::transpose(io::cells::perm_vtk(topology.cell_type(), degree));
   // TODO: Remove when when paraview issue 19433 is resolved
   // (https://gitlab.kitware.com/paraview/paraview/issues/19433)
   if (topology.cell_type() == mesh::CellType::hexahedron and num_nodes == 27)

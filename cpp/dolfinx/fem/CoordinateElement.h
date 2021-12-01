@@ -198,6 +198,10 @@ public:
   /// @return True is geometry map is affine
   bool is_affine() const noexcept { return _is_affine; }
 
+  /// Get the degree of the coordinate element
+  /// @return The degree
+  int degree() const;
+
 private:
   // Flag denoting affine map
   bool _is_affine;

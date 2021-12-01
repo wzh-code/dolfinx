@@ -339,9 +339,11 @@ XDMFFile::read_meshtags(const std::shared_ptr<const mesh::Mesh>& mesh,
       = xdmf_utils::get_cell_type(grid_node.child("Topology"));
   mesh::CellType cell_type = mesh::to_type(cell_type_str.first);
 
+  int degree = mesh->geometry().cmap().degree();
+
   // Permute entities from VTK to DOLFINx ordering
   xt::xtensor<std::int64_t, 2> entities1 = io::cells::compute_permutation(
-      entities, io::cells::perm_vtk(cell_type, entities.shape(1)));
+      entities, io::cells::perm_vtk(cell_type, degree));
 
   const auto [entities_local, values_local]
       = xdmf_utils::distribute_entity_data(*mesh, mesh::cell_dim(cell_type),

@@ -37,6 +37,7 @@ void xdmf_mesh::add_topology_data(
 
   // Get number of nodes per entity
   const int num_nodes_per_entity = cmap_dof_layout.num_entity_closure_dofs(dim);
+  const int cmap_degree = geometry.cmap().degree();
 
   // FIXME: sort out degree/cell type
   // Get VTK string for cell type
@@ -57,7 +58,7 @@ void xdmf_mesh::add_topology_data(
 
   const std::vector<std::int64_t>& ghosts = map_g->ghosts();
   const std::vector vtk_map = io::cells::transpose(
-      io::cells::perm_vtk(entity_cell_type, num_nodes_per_entity));
+      io::cells::perm_vtk(entity_cell_type, cmap_degree));
   auto map_e = topology.index_map(dim);
   assert(map_e);
   if (dim == tdim)
