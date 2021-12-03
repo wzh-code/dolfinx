@@ -430,15 +430,13 @@ xdmf_utils::distribute_entity_data(const mesh::Mesh& mesh, int entity_dim,
   const std::int64_t num_nodes_g = mesh.geometry().index_map()->size_global();
   const MPI_Comm comm = mesh.comm();
   const int comm_size = MPI::size(comm);
-  // NOTE: could make this int32_t be sending: index <- index - dest_rank_offset
+  // NOTE: could send int32_t  index, i.e. send: index <- index-dest_rank_offset
   std::vector<std::vector<std::int64_t>> nodes_g_send(comm_size);
   for (std::int64_t node : nodes_g)
   {
-    // TODO: Optimise this call by adding 'vectorised verion of
-    //       MPI::index_owner
-    // Figure out which process is the postmaster for the input global index
-    const std::int32_t p
-        = dolfinx::MPI::index_owner(comm_size, node, num_nodes_g);
+    // Figure out which process is the postmaster for the input global
+    // index
+    std::int32_t p = dolfinx::MPI::index_owner(comm_size, node, num_nodes_g);
     nodes_g_send[p].push_back(node);
   }
 
@@ -451,7 +449,7 @@ xdmf_utils::distribute_entity_data(const mesh::Mesh& mesh, int entity_dim,
   //    on the lowest index node in the entity 'key'
   //
   //    NOTE: Stage 2 doesn't depend on the data received in Step 1, so
-  //    data (i) the communication could be combined, or (ii) the
+  //    (i) the data communication could be combined, or (ii) the data
   //    communication in Step 1 could be make non-blocking.
 
   std::vector<std::vector<std::int64_t>> entities_send(comm_size);
