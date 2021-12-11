@@ -371,12 +371,13 @@ interpolation_coords(const fem::FiniteElement& element, const mesh::Mesh& mesh,
 /// @param[in] f Evaluation of the function `f(x)` at the physical
 /// points `x` given by fem::interpolation_coords. The element used in
 /// fem::interpolation_coords should be the same element as associated
-/// with `u`.
+/// with `u`. The shape is (value_size, num_cells), or (num_cells,) if
+/// value_size=1.
 /// @param[in] cells Indices of the cells in the mesh on which to
 /// interpolate. Should be the same as the list used when calling
 /// fem::interpolation_coords.
 template <typename T>
-void interpolate(Function<T>& u, xt::xarray<T>& f,
+void interpolate(Function<T>& u, const xt::xarray<T>& f,
                  const xtl::span<const std::int32_t>& cells)
 {
   const std::shared_ptr<const FiniteElement> element
