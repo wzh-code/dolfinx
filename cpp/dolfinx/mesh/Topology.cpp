@@ -442,6 +442,42 @@ std::vector<bool> mesh::compute_boundary_facets(const Topology& topology)
   return _boundary_facet;
 }
 //-----------------------------------------------------------------------------
+std::vector<bool> mesh::compute_interface_facets(const Topology& topology)
+{
+  const int tdim = topology.dim();
+  auto facets = topology.index_map(tdim - 1);
+  if (!facets)
+    throw std::runtime_error("Facets have not been computed.");
+
+  auto fc = topology.connectivity(tdim - 1, tdim);
+  if (!fc)
+    throw std::runtime_error("Facet-cell connectivity missing.");
+
+  const std::vector<int32_t>& fwd_shared_facets
+      = facets->scatter_fwd_indices().array();
+
+  std::int32_t num_facets = facets->size_local() + facets->num_ghosts();
+  std::vector<bool> _interface_facets(num_facets, false);
+
+  // If a shared facet is connected to a single cell it's on the interface
+  // between adjacent subdomains
+  for (const std::int32_t& f : fwd_shared_facets)
+  {
+    if (fc->num_links(f) == 1)
+      _interface_facets[f] = true;
+  }
+
+  // If a ghost facet is connected to a single cell it's on the interface
+  // between adjacent subdomains
+  for (std::int32_t f = facets->size_local(); f < num_facets; ++f)
+  {
+    if (fc->num_links(f) == 1)
+      _interface_facets[f] = true;
+  }
+
+  return _interface_facets;
+}
+//-----------------------------------------------------------------------------
 Topology::Topology(MPI_Comm comm, mesh::CellType type)
     : _comm(comm), _cell_type(type),
       _connectivity(
