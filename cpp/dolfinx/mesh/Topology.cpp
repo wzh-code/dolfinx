@@ -475,6 +475,26 @@ std::vector<bool> mesh::compute_interface_facets(const Topology& topology)
       _interface_facets[f] = true;
   }
 
+  // Remove exterior domain facets
+  std::vector<bool> boundary_facet = mesh::compute_boundary_facets(topology);
+  std::transform(boundary_facet.begin(), boundary_facet.end(),
+                 _interface_facets.begin(), _interface_facets.begin(),
+                 [](const auto& f0, const auto& f1)
+                 { return f0 ? false : f1; });
+
+  // Remove exterior domain facets from ghosts
+  std::vector<short int> ghosts(facets->num_ghosts(), 0);
+  std::vector<short int> _boundary_facet(boundary_facet.size());
+  std::copy(boundary_facet.begin(), boundary_facet.end(),
+            _boundary_facet.begin());
+  facets->scatter_fwd<short int>(tcb::make_span(_boundary_facet),
+                                 tcb::make_span(ghosts), 1);
+  std::transform(ghosts.begin(), ghosts.end(),
+                 _interface_facets.begin() + facets->size_local(),
+                 _interface_facets.begin() + facets->size_local(),
+                 [](const short int& f0, const auto& f1)
+                 { return f0 ? false : f1; });
+
   return _interface_facets;
 }
 //-----------------------------------------------------------------------------

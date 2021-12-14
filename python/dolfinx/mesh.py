@@ -13,7 +13,7 @@ import numpy as np
 import ufl
 from dolfinx import cpp as _cpp
 from dolfinx.cpp.mesh import (CellType, GhostMode, build_dual_graph, cell_dim,
-                              compute_boundary_facets,
+                              compute_boundary_facets, compute_interface_facets,
                               compute_incident_entities, compute_midpoints,
                               create_cell_partitioner, create_meshtags)
 
@@ -22,7 +22,8 @@ from mpi4py import MPI as _MPI
 __all__ = ["create_meshtags", "locate_entities", "locate_entities_boundary",
            "refine", "create_mesh", "create_meshtags", "MeshTags", "CellType",
            "GhostMode", "build_dual_graph", "cell_dim", "compute_midpoints",
-           "compute_boundary_facets", "compute_incident_entities", "create_cell_partitioner"]
+           "compute_boundary_facets", "compute_interface_facets",
+           "compute_incident_entities", "create_cell_partitioner"]
 
 
 class Mesh(_cpp.mesh.Mesh):
@@ -153,6 +154,14 @@ def refine(mesh: Mesh, edges: np.ndarray = None, redistribute: bool = True) -> M
     coordinate_element = mesh._ufl_domain.ufl_coordinate_element()
     domain = ufl.Mesh(coordinate_element)
     return Mesh.from_cpp(mesh_refined, domain)
+
+
+def add_ghosts(mesh, dest):
+    """Create new mesh with attached ghost layer."""
+    new_mesh = _cpp.mesh.add_ghosts(mesh, dest)
+    coordinate_element = mesh._ufl_domain.ufl_coordinate_element()
+    domain = ufl.Mesh(coordinate_element)
+    return Mesh.from_cpp(new_mesh, domain)
 
 
 def create_mesh(comm: _MPI.Comm, cells: typing.Union[np.ndarray, _cpp.graph.AdjacencyList_int64],

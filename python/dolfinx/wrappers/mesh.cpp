@@ -158,6 +158,7 @@ void mesh(py::module& m)
               mesh, dim, xtl::span(entity_list.data(), entity_list.size())));
         });
   m.def("compute_boundary_facets", &dolfinx::mesh::compute_boundary_facets);
+  m.def("compute_interface_facets", &dolfinx::mesh::compute_interface_facets);
 
   using PythonPartitioningFunction
       = std::function<dolfinx::graph::AdjacencyList<std::int32_t>(
@@ -405,5 +406,6 @@ void mesh(py::module& m)
           return as_pyarray(dolfinx::mesh::compute_incident_entities(
               mesh, xtl::span(entity_list.data(), entity_list.size()), d0, d1));
         });
+  m.def("add_ghosts", dolfinx::mesh::add_ghosts);
 }
 } // namespace dolfinx_wrappers
