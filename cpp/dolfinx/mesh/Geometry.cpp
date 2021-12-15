@@ -12,6 +12,8 @@
 #include <dolfinx/fem/dofmapbuilder.h>
 #include <dolfinx/graph/partition.h>
 
+#include <xtensor/xio.hpp>
+
 using namespace dolfinx;
 using namespace dolfinx::mesh;
 
@@ -104,6 +106,46 @@ mesh::Geometry mesh::create_geometry(
   std::vector<std::int64_t> igi(indices.size());
   std::transform(l2l.cbegin(), l2l.cend(), igi.begin(),
                  [&indices](auto index) { return indices[index]; });
+
+  std::stringstream ss;
+  int rank = dolfinx::MPI::rank(comm);
+  ss << "rank = " << rank << "\n";
+  ss << "create_geometry xg = \n";
+  ss << xg << "\n";
+
+  ss << "create_geometry dofmap =\n";
+  for (auto cell = 0; cell < dofmap.num_nodes(); ++cell)
+  {
+    ss << "cell " << cell << ": ";
+    for (auto dof : dofmap.links(cell))
+    {
+      ss << dof << " ";
+    }
+    ss << "\n";
+  }
+  ss << "\n";
+
+  ss << "create_geometry dof_index_map->global_indices() = ";
+  for (auto i : dof_index_map->global_indices())
+  {
+    ss << i << " ";
+  }
+  ss << "\n";
+
+  ss << "create_geometry dof_index_map->ghosts() = ";
+  for (auto i : dof_index_map->ghosts())
+  {
+    ss << i << " ";
+  }
+  ss << "\n";
+
+  ss << "create_geometry igi = ";
+  for (auto i : igi)
+  {
+    ss << i << " ";
+  }
+
+  // std::cout << ss.str() << "\n";
 
   return Geometry(dof_index_map, std::move(dofmap), coordinate_element,
                   std::move(xg), std::move(igi));

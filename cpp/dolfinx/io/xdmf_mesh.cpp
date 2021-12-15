@@ -10,6 +10,7 @@
 #include "xdmf_read.h"
 #include "xdmf_utils.h"
 #include <dolfinx/fem/ElementDofLayout.h>
+#include <xtensor/xio.hpp>
 
 using namespace dolfinx;
 using namespace dolfinx::io;
@@ -149,9 +150,7 @@ void xdmf_mesh::add_geometry_data(MPI_Comm comm, pugi::xml_node& xml_node,
                                   const std::string path_prefix,
                                   const mesh::Geometry& geometry)
 {
-
   LOG(INFO) << "Adding geometry data to node \"" << xml_node.path('/') << "\"";
-
   auto map = geometry.index_map();
   assert(map);
 
@@ -175,6 +174,7 @@ void xdmf_mesh::add_geometry_data(MPI_Comm comm, pugi::xml_node& xml_node,
 
   int num_values = num_points_local * width;
   std::vector<double> x(num_values, 0.0);
+
   if (width == 3)
     std::copy_n(_x.data(), num_values, x.begin());
   else
@@ -208,11 +208,11 @@ void xdmf_mesh::add_mesh(MPI_Comm comm, pugi::xml_node& xml_node,
   assert(grid_node);
   grid_node.append_attribute("Name") = name.c_str();
   grid_node.append_attribute("GridType") = "Uniform";
-
+ 
   // Add topology node and attributes (including writing data)
   const std::string path_prefix = "/Mesh/" + name;
   const int tdim = mesh.topology().dim();
-
+ 
   // Prepare an array of active cells
   // Writing whole mesh so each cell is active, excl. ghosts
   auto map = mesh.topology().index_map(tdim);
@@ -220,14 +220,14 @@ void xdmf_mesh::add_mesh(MPI_Comm comm, pugi::xml_node& xml_node,
   const int num_cells = map->size_local();
   std::vector<std::int32_t> active_cells(num_cells);
   std::iota(active_cells.begin(), active_cells.end(), 0);
-
+ 
   add_topology_data(comm, grid_node, h5_id, path_prefix, mesh.topology(),
                     mesh.geometry(), tdim,
                     xtl::span<std::int32_t>(active_cells.data(), num_cells));
-
+ 
   // Add geometry node and attributes (including writing data)
   add_geometry_data(comm, grid_node, h5_id, path_prefix, mesh.geometry());
-}
+ }
 //----------------------------------------------------------------------------
 xt::xtensor<double, 2> xdmf_mesh::read_geometry_data(MPI_Comm comm,
                                                      const hid_t h5_id,

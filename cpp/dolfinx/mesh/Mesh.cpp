@@ -23,6 +23,10 @@
 
 #include "graphbuild.h"
 
+#include <iostream>
+#include <sstream>
+#include <string>
+
 using namespace dolfinx;
 using namespace dolfinx::mesh;
 
@@ -66,11 +70,8 @@ Mesh mesh::create_mesh(MPI_Comm comm,
                        const xt::xtensor<double, 2>& x,
                        mesh::GhostMode ghost_mode)
 {
-  return create_mesh(
-      comm, cells, element, x, ghost_mode,
-      static_cast<graph::AdjacencyList<std::int32_t> (*)(
-          MPI_Comm, int, int, const graph::AdjacencyList<std::int64_t>&,
-          mesh::GhostMode)>(&mesh::partition_cells_graph));
+  return create_mesh(comm, cells, element, x, ghost_mode,
+                     create_cell_partitioner());
 }
 //-----------------------------------------------------------------------------
 Mesh mesh::create_mesh(MPI_Comm comm,
@@ -178,122 +179,203 @@ Mesh mesh::create_mesh(MPI_Comm comm,
 //-----------------------------------------------------------------------------
 Mesh Mesh::sub(int dim, const xtl::span<const std::int32_t>& entities)
 {
-  _topology.create_connectivity(dim, 0);
+  // TODO Specify sizes of vectors
 
-  auto e_to_v = _topology.connectivity(dim, 0);
+  // Submesh topology
+  // Get the verticies in the submesh
+  std::vector<std::int32_t> submesh_vertices
+      = mesh::compute_incident_entities(*this, entities, dim, 0);
 
-  // TODO Reserve number as in meshview branch
-  // Create vector of unique and ordered vertices
-  std::vector<std::int32_t> submesh_vertices;
-  for (auto e : entities)
-  {
-    auto vs = e_to_v->links(e);
-    submesh_vertices.insert(submesh_vertices.end(), vs.begin(), vs.end());
-  }
-  std::sort(submesh_vertices.begin(), submesh_vertices.end());
-  submesh_vertices.erase(
-      std::unique(submesh_vertices.begin(), submesh_vertices.end()),
-      submesh_vertices.end());
-
-  // Vertex index map
+  // For some processes, entities may be empty, but they might still own
+  // vertices in the submesh that need to be included.
   auto vertex_index_map = _topology.index_map(0);
+  std::vector<int32_t> submesh_owned_vertices
+      = dolfinx::common::get_owned_indices(comm(), submesh_vertices,
+                                           vertex_index_map);
+
+  // Create submesh vertex index map
   std::pair<common::IndexMap, std::vector<int32_t>>
       submesh_vertex_index_map_pair
-      = vertex_index_map->create_submap(submesh_vertices);
+      = vertex_index_map->create_submap(submesh_owned_vertices);
   auto submesh_vertex_index_map = std::make_shared<common::IndexMap>(
       std::move(submesh_vertex_index_map_pair.first));
-  auto global_vertices = submesh_vertex_index_map_pair.second;
 
-  // Entity index map
+  // Get the entities in the submesh that are owned by this process
   auto entity_index_map = _topology.index_map(dim);
+  std::vector<std::int32_t> submesh_owned_entities; // Local numbering
+  for (auto e : entities)
+  {
+    if (e < entity_index_map->size_local())
+    {
+      submesh_owned_entities.push_back(e);
+    }
+  }
+
+  // Create submesh entity index map
+  // NOTE Here it is assumed that every ghost entity in entities corresponds
+  // to an owned entity in entities on another process. This means that
+  // the ghost entities don't need to be communicated back to their owners,
+  // although it is simple to enable this functionality.
   std::pair<common::IndexMap, std::vector<int32_t>>
-      submesh_entity_index_map_pair = entity_index_map->create_submap(entities);
+      submesh_entity_index_map_pair
+      = entity_index_map->create_submap(submesh_owned_entities);
   auto submesh_entity_index_map = std::make_shared<common::IndexMap>(
       std::move(submesh_entity_index_map_pair.first));
-  auto global_entities = submesh_entity_index_map_pair.second;
 
-  // Vertex index map
+  // Submesh vertex to vertex connectivity (identity)
   auto submesh_v_to_v = std::make_shared<graph::AdjacencyList<std::int32_t>>(
       submesh_vertex_index_map->size_local()
       + submesh_vertex_index_map->num_ghosts());
 
-  std::vector<std::int32_t> submesh_entities;
-  std::vector<std::int32_t> offsets(1, 0);
-  for (auto entity : entities)
+  // Submesh entity to vertex connectivity
+  auto e_to_v = _topology.connectivity(dim, 0);
+  std::vector<std::int32_t> submesh_e_to_v_vec;
+  std::vector<std::int32_t> submesh_e_to_v_offsets(1, 0);
+  for (std::int32_t e : entities)
   {
-    auto vertices = e_to_v->links(entity);
+    xtl::span<const std::int32_t> vertices = e_to_v->links(e);
 
-    for (auto vertex : vertices)
+    for (std::int32_t v : vertices)
     {
-      auto submesh_vertex_it
-          = std::find(submesh_vertices.begin(), submesh_vertices.end(), vertex);
-      assert(submesh_vertex_it != submesh_vertices.end());
-      std::int32_t submesh_vertex
-          = std::distance(submesh_vertices.begin(), submesh_vertex_it);
-      submesh_entities.push_back(submesh_vertex);
+      auto it = std::find(submesh_vertices.begin(), submesh_vertices.end(), v);
+      assert(it != submesh_vertices.end());
+      submesh_e_to_v_vec.push_back(std::distance(submesh_vertices.begin(), it));
     }
-    offsets.push_back(submesh_entities.size());
+    submesh_e_to_v_offsets.push_back(submesh_e_to_v_vec.size());
   }
-
   auto submesh_e_to_v = std::make_shared<graph::AdjacencyList<std::int32_t>>(
-      submesh_entities, offsets);
+      submesh_e_to_v_vec, submesh_e_to_v_offsets);
 
+  // Create submesh topology
   const CellType entity_type
       = mesh::cell_entity_type(_topology.cell_type(), dim, 0);
-  mesh::Topology submesh_topology(mpi_comm(), entity_type);
+  mesh::Topology submesh_topology(comm(), entity_type);
   submesh_topology.set_index_map(0, submesh_vertex_index_map);
   submesh_topology.set_index_map(dim, submesh_entity_index_map);
   submesh_topology.set_connectivity(submesh_v_to_v, 0, 0);
   submesh_topology.set_connectivity(submesh_e_to_v, dim, 0);
 
-  auto e_to_g = mesh::entities_to_geometry(*this, dim, entities, false);
-  xt::xarray<int> unique_sorted_x_dofs = xt::unique(e_to_g);
+  // Submesh geometry
+  // Get the geometry dofs in the submesh based on the entities in
+  // submesh
+  xt::xtensor<std::int32_t, 2> e_to_g
+      = mesh::entities_to_geometry(*this, dim, entities, false);
+  // FIXME Find better way to do this
+  xt::xarray<int32_t> submesh_x_dofs_xt = xt::unique(e_to_g);
+  std::vector<int32_t> submesh_x_dofs(submesh_x_dofs_xt.begin(),
+                                      submesh_x_dofs_xt.end());
 
-  std::vector<std::int64_t> submesh_cells;
-  submesh_cells.reserve(e_to_g.shape()[0] * e_to_g.shape()[1]);
-  std::vector<std::int32_t> submesh_cells_offsets(1, 0);
-  for (std::size_t i = 0; i < e_to_g.shape()[0]; ++i)
+  std::shared_ptr<const dolfinx::common::IndexMap> geometry_dof_index_map
+      = this->geometry().index_map();
+
+  // For some processes, entities may be empty, but they might still own
+  // geometry dofs in the submesh that need to be included.
+  auto submesh_owned_x_dofs = dolfinx::common::get_owned_indices(
+      comm(), submesh_x_dofs, geometry_dof_index_map);
+
+  // Add any owned geometry dofs in the submesh that might come from other
+  // processes
+  submesh_x_dofs.insert(submesh_x_dofs.end(), submesh_owned_x_dofs.begin(),
+                        submesh_owned_x_dofs.end());
+
+  // Create submesh geometry index map
+  std::pair<common::IndexMap, std::vector<int32_t>> submesh_x_dof_index_map_pair
+      = geometry_dof_index_map->create_submap(submesh_owned_x_dofs);
+  auto submesh_x_dof_index_map = std::make_shared<common::IndexMap>(
+      std::move(submesh_x_dof_index_map_pair.first));
+  // TODO Consider renaming
+  auto submesh_x_dof_index_map_ghost_map
+      = std::move(submesh_x_dof_index_map_pair.second);
+
+  // On some processes, the ghosts in submesh_x_dof_index_map may not be in
+  // submesh_x_dofs, so these must be added so that each dof in the index map
+  // has geometry data (i.e. coordinates)
+
+  // Get the local indices of ghosts in the mesh (this) that are present in
+  // the submesh
+  std::vector<std::int32_t> x_dof_ghosts_local;
+  std::vector<std::int64_t> geom_global_indices
+      = geometry_dof_index_map->global_indices();
+  for (int i = 0; i < submesh_x_dof_index_map->ghosts().size(); ++i)
   {
-    auto entity_x_dofs = xt::row(e_to_g, i);
+    // Global index of submesh_x_dof_index_map->ghosts()[i] in the mesh (this)
+    std::int64_t ghost = geometry_dof_index_map
+                             ->ghosts()[submesh_x_dof_index_map_ghost_map[i]];
 
-    std::vector<std::int64_t> submesh_entity_x_dofs;
-    for (auto x_dof : entity_x_dofs)
-    {
-      auto x_dof_it = std::find(unique_sorted_x_dofs.begin(),
-                                unique_sorted_x_dofs.end(), x_dof);
-      assert(x_dof_it != unique_sorted_x_dofs.end());
-      std::int64_t submesh_x_dof
-          = std::distance(unique_sorted_x_dofs.begin(), x_dof_it);
-      submesh_entity_x_dofs.push_back(submesh_x_dof);
-    }
-    submesh_cells.insert(submesh_cells.end(), submesh_entity_x_dofs.begin(),
-                         submesh_entity_x_dofs.end());
-    submesh_cells_offsets.push_back(submesh_cells.size());
+    // Get the local index
+    auto it = std::find(geom_global_indices.begin(), geom_global_indices.end(),
+                        ghost);
+    assert(it != geom_global_indices.end());
+    x_dof_ghosts_local.push_back(
+        std::distance(geom_global_indices.begin(), it));
   }
 
-  graph::AdjacencyList<std::int64_t> submesh_cells_al(
-      std::move(submesh_cells), std::move(submesh_cells_offsets));
+  // Add the ghosts just found to submesh_x_dofs
+  submesh_x_dofs.insert(submesh_x_dofs.end(), x_dof_ghosts_local.begin(),
+                        x_dof_ghosts_local.end());
 
-  const int submesh_num_x_dofs = unique_sorted_x_dofs.shape()[0];
-  const int geom_dim = this->geometry().dim();
-  xt::xarray<double> submesh_x = xt::zeros<double>({submesh_num_x_dofs, geom_dim});
+  // Create a sorted list of unique geometry dofs. submesh_x_dofs maps the
+  // submesh geometry dofs to the mesh (this) geometry dofs i.e. dof 3 in the
+  // submesh is x_dof submesh_x_dofs[3] in the mesh
+  std::sort(submesh_x_dofs.begin(), submesh_x_dofs.end());
+  submesh_x_dofs.erase(
+      std::unique(submesh_x_dofs.begin(), submesh_x_dofs.end()),
+      submesh_x_dofs.end());
+
+  // Create submesh geometry coordinates
   const xt::xtensor<double, 2>& x = geometry().x();
+  const int submesh_num_x_dofs = submesh_x_dofs.size();
+  const int gdim = this->geometry().dim();
+  xt::xarray<double> submesh_x = xt::zeros<double>({submesh_num_x_dofs, gdim});
   for (int i = 0; i < submesh_num_x_dofs; ++i)
   {
-    xt::view(submesh_x, i, xt::all()) =
-      xt::view(x, unique_sorted_x_dofs[i], xt::range(0, geom_dim));
+    xt::view(submesh_x, i, xt::all())
+        = xt::view(x, submesh_x_dofs[i], xt::range(0, gdim));
   }
 
+  // Crete submesh geometry dofmap
+  std::vector<std::int32_t> submesh_x_dofmap_vec;
+  std::vector<std::int32_t> submesh_x_dofmap_offsets(1, 0);
+  for (std::size_t i = 0; i < e_to_g.shape()[0]; ++i)
+  {
+    // Get the mesh geometry dofs for ith entity in entities
+    auto entity_x_dofs = xt::row(e_to_g, i);
+
+    // For each mesh dof of the entity, get the submesh dof
+    for (std::int32_t x_dof : entity_x_dofs)
+    {
+      auto it = std::find(submesh_x_dofs.begin(), submesh_x_dofs.end(), x_dof);
+      assert(it != submesh_x_dofs.end());
+      submesh_x_dofmap_vec.push_back(std::distance(submesh_x_dofs.begin(), it));
+    }
+    submesh_x_dofmap_offsets.push_back(submesh_x_dofmap_vec.size());
+  }
+  graph::AdjacencyList<std::int32_t> submesh_x_dofmap(
+      std::move(submesh_x_dofmap_vec), std::move(submesh_x_dofmap_offsets));
+
+  // Create submesh coordinate element
   CellType submesh_coord_cell
       = mesh::cell_entity_type(geometry().cmap().cell_shape(), dim, 0);
   // FIXME Currently geometry degree is hardcoded to 1 as there is no way to
   // retrive this from the coordinate element
   auto submesh_coord_ele = fem::CoordinateElement(submesh_coord_cell, 1);
-  auto submesh_geometry
-      = mesh::create_geometry(mpi_comm(), submesh_topology, submesh_coord_ele,
-                              submesh_cells_al, submesh_x);
-  return Mesh(mpi_comm(), std::move(submesh_topology),
-              std::move(submesh_geometry));
+
+  // Submesh geometry input_global_indices
+  // TODO Check this. Not 100 % sure what igi does
+  const std::vector<std::int64_t>& igi
+      = this->geometry().input_global_indices();
+  std::vector<std::int64_t> submesh_igi;
+  for (auto submesh_x_dof : submesh_x_dofs)
+  {
+    submesh_igi.push_back(igi[submesh_x_dof]);
+  }
+
+  // Create geometry
+  mesh::Geometry submesh_geometry(
+      submesh_x_dof_index_map, std::move(submesh_x_dofmap), submesh_coord_ele,
+      std::move(submesh_x), std::move(submesh_igi));
+
+  return Mesh(comm(), std::move(submesh_topology), std::move(submesh_geometry));
 }
 //-----------------------------------------------------------------------------
 Topology& Mesh::topology() { return _topology; }
@@ -306,5 +388,5 @@ Geometry& Mesh::geometry() { return _geometry; }
 //-----------------------------------------------------------------------------
 const Geometry& Mesh::geometry() const { return _geometry; }
 //-----------------------------------------------------------------------------
-MPI_Comm Mesh::mpi_comm() const { return _mpi_comm.comm(); }
+MPI_Comm Mesh::comm() const { return _comm.comm(); }
 //-----------------------------------------------------------------------------
