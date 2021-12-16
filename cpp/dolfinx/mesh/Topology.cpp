@@ -459,40 +459,43 @@ std::vector<bool> mesh::compute_interface_facets(const Topology& topology)
   std::int32_t num_facets = facets->size_local() + facets->num_ghosts();
   std::vector<bool> _interface_facets(num_facets, false);
 
-  // If a shared facet is connected to a single cell it's on the interface
-  // between adjacent subdomains
+  // If a shared facet is connected to a single cell it's a candidate to be on
+  // the interface between adjacent subdomains
   for (const std::int32_t& f : fwd_shared_facets)
   {
     if (fc->num_links(f) == 1)
       _interface_facets[f] = true;
   }
 
-  // If a ghost facet is connected to a single cell it's on the interface
-  // between adjacent subdomains
+  // If a ghost facet is connected to a single cell it's a candidate to be on
+  // the interface between adjacent subdomains
   for (std::int32_t f = facets->size_local(); f < num_facets; ++f)
   {
     if (fc->num_links(f) == 1)
       _interface_facets[f] = true;
   }
 
-  // Remove exterior domain facets
+  // Remove local exterior domain facets from candidates
   std::vector<bool> boundary_facet = mesh::compute_boundary_facets(topology);
   std::transform(boundary_facet.begin(), boundary_facet.end(),
                  _interface_facets.begin(), _interface_facets.begin(),
                  [](const auto& f0, const auto& f1)
                  { return f0 ? false : f1; });
 
-  // Remove exterior domain facets from ghosts
-  std::vector<short int> ghosts(facets->num_ghosts(), 0);
+  // Remove remote exterior domain facets from candidates
+  // Note: std::vector<bool> cannot be converted to span<bool>, using short int
+  // instead
+  std::vector<short int> remote_boundary_facets(facets->num_ghosts(), 0);
   std::vector<short int> _boundary_facet(boundary_facet.size());
+  // Copy over as an
   std::copy(boundary_facet.begin(), boundary_facet.end(),
             _boundary_facet.begin());
   facets->scatter_fwd<short int>(tcb::make_span(_boundary_facet),
-                                 tcb::make_span(ghosts), 1);
-  std::transform(ghosts.begin(), ghosts.end(),
+                                 tcb::make_span(remote_boundary_facets), 1);
+  std::transform(remote_boundary_facets.begin(), remote_boundary_facets.end(),
                  _interface_facets.begin() + facets->size_local(),
                  _interface_facets.begin() + facets->size_local(),
-                 [](const short int& f0, const auto& f1)
+                 [](const short int& f0, const bool& f1)
                  { return f0 ? false : f1; });
 
   return _interface_facets;
