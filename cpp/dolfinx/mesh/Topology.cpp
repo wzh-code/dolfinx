@@ -462,18 +462,12 @@ std::vector<bool> mesh::compute_interface_facets(const Topology& topology)
   // If a shared facet is connected to a single cell it's a candidate to be on
   // the interface between adjacent subdomains
   for (const std::int32_t& f : fwd_shared_facets)
-  {
-    if (fc->num_links(f) == 1)
-      _interface_facets[f] = true;
-  }
+    _interface_facets[f] = fc->num_links(f) == 1;
 
   // If a ghost facet is connected to a single cell it's a candidate to be on
   // the interface between adjacent subdomains
   for (std::int32_t f = facets->size_local(); f < num_facets; ++f)
-  {
-    if (fc->num_links(f) == 1)
-      _interface_facets[f] = true;
-  }
+    _interface_facets[f] = fc->num_links(f) == 1;
 
   // Remove local exterior domain facets from candidates
   std::vector<bool> boundary_facet = mesh::compute_boundary_facets(topology);

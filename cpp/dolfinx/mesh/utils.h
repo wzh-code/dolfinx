@@ -157,7 +157,14 @@ compute_incident_entities(const Mesh& mesh,
 /// @param[in] mesh The mesh
 /// @param[in] dest Destination rank for mesh cells owned by this rank
 /// @return Mesh with new ghosts
-mesh::Mesh add_ghosts(const mesh::Mesh& mesh,
-                      graph::AdjacencyList<std::int32_t>& dest);
+mesh::Mesh update_ghosts(const mesh::Mesh& mesh,
+                         graph::AdjacencyList<std::int32_t>& dest);
+
+/// Add a layer of ghosts to the local mesh with all remote cells that are
+/// incident to its interface entities of dimension dim.
+/// @param[in] mesh The mesh
+/// @param[in] dim Entity dimension
+/// @return Mesh with new ghost layer
+mesh::Mesh add_ghost_layer(const mesh::Mesh& mesh, int dim);
 
 } // namespace dolfinx::mesh

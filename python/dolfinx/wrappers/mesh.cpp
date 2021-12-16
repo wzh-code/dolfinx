@@ -429,7 +429,7 @@ void mesh(py::module& m)
           return as_pyarray(dolfinx::mesh::compute_incident_entities(
               mesh, xtl::span(entity_list.data(), entity_list.size()), d0, d1));
         });
-  m.def("add_ghosts", dolfinx::mesh::add_ghosts);
+  m.def("update_ghosts", dolfinx::mesh::update_ghosts);
 
   // Mesh generation
   py::enum_<dolfinx::mesh::DiagonalType>(m, "DiagonalType")

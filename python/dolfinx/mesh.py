@@ -158,9 +158,9 @@ def refine(mesh: Mesh, edges: np.ndarray = None, redistribute: bool = True) -> M
     return Mesh.from_cpp(mesh_refined, domain)
 
 
-def add_ghosts(mesh, dest):
+def update_ghosts(mesh, dest):
     """Create new mesh with attached ghost layer."""
-    new_mesh = _cpp.mesh.add_ghosts(mesh, dest)
+    new_mesh = _cpp.mesh.update_ghosts(mesh, dest)
     coordinate_element = mesh._ufl_domain.ufl_coordinate_element()
     domain = ufl.Mesh(coordinate_element)
     return Mesh.from_cpp(new_mesh, domain)
