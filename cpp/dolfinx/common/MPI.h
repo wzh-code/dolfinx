@@ -177,7 +177,7 @@ constexpr MPI_Datatype mpi_type()
   else if constexpr (std::is_same<T, std::int8_t>::value)
     return MPI_INT8_T;
   else
-    // Compile time error
+    // Issue compile time error
     static_assert(!std::is_same<T, T>::value);
 }
 
