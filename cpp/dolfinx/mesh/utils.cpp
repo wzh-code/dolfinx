@@ -637,10 +637,13 @@ mesh::Mesh add_ghost_layer(const mesh::Mesh& mesh, int dim)
   int facet_dim = tdim - 1;
 
   if (dim >= tdim || dim < 0)
-    throw std::runtime_error(
-        "Entity dimension should an integer between 0 and tdim-1");
+    throw std::runtime_error("Entity dimension should an integer between 0 and "
+                             "the facet dimension ("
+                             + std::to_string(facet_dim) + ")");
 
-  // Compute interface facets
+  // Compute facets on the interface between this process and adjacent
+  // neighbors. The facets can be either owned and shared or ghosts is this
+  // process.
   std::vector<bool> facets_bool
       = dolfinx::mesh::compute_interface_facets(topology);
   int num_interface_facets = std::reduce(facets_bool.begin(), facets_bool.end(),
@@ -649,6 +652,7 @@ mesh::Mesh add_ghost_layer(const mesh::Mesh& mesh, int dim)
   if (num_interface_facets == 0)
     return mesh;
 
+  // Convert vector of bools (flags) to vector of facet indices
   std::vector<std::int32_t> facets(num_interface_facets);
   std::int32_t pos = 0;
   for (auto it = facets_bool.begin(); it != facets_bool.end(); it++)
@@ -660,12 +664,13 @@ mesh::Mesh add_ghost_layer(const mesh::Mesh& mesh, int dim)
     }
   }
 
+  // Compute interface entities of dimension "dim", entities that are incident
+  // to the interface facets.
   std::vector<std::int32_t> entities;
   if (dim == facet_dim)
     std::swap(entities, facets);
   else
   {
-    // Compute entities on the interface
     std::shared_ptr<const dolfinx::graph::AdjacencyList<int32_t>>
         facets_entities = topology.connectivity(facet_dim, dim);
 
@@ -676,97 +681,286 @@ mesh::Mesh add_ghost_layer(const mesh::Mesh& mesh, int dim)
         entities.push_back(e);
     }
   }
+
   // Sort entities and remove duplicates
   dolfinx::radix_sort<std::int32_t>(entities);
   entities.erase(std::unique(entities.begin(), entities.end()), entities.end());
 
-  // Get the owner of interface entities
-  std::shared_ptr<const common::IndexMap> map = topology.index_map(dim);
-  std::int32_t local_size = map->size_local();
-  std::vector<int> ghost_owner_rank = map->ghost_owner_rank();
+  // Get owned and ghost entities range
+  std::shared_ptr<const common::IndexMap> entity_map = topology.index_map(dim);
+  std::int32_t num_entities_dim = entity_map->size_local();
+  std::int32_t num_owned_entities = std::distance(
+      entities.begin(),
+      std::lower_bound(entities.begin(), entities.end(), num_entities_dim));
+  std::int32_t num_ghost_entities = entities.size() - num_owned_entities;
 
-  // Get first ghost entity, ignore owned entities for now
-  auto ghost_begin
-      = std::lower_bound(entities.begin(), entities.end(), local_size);
-  std::int32_t num_owned = std::distance(entities.begin(), ghost_begin);
-  std::int32_t num_ghost_entities = entities.size() - num_owned;
+  // The computation of ghost layer is performed in 5 neighbor-wise
+  // communication steps:
+  // 1 - Request [ghost->owner] : Process request entity-cell connectivity
+  // information.
+  // 2 - Distribute Requests [onwer->ghost] : Owner distributes the request to
+  // all sharing processes.
+  // 3 - Reply[ghost->owner] : Sharing process replies (entity-cell connectivity
+  // information).
+  // 4 - Distribute Replies [onwer->ghost] : Owner process distribute replies
+  // entity-cell connectivity information to the requesting processes.
+  // 5 - Finalize [ghost->owner]: Process computes new ghosts and informs the
+  // owning processes.
 
-  // Ghost to owner communicator
-  MPI_Comm comm = map->comm(common::IndexMap::Direction::reverse);
-  const auto dest_ranks = dolfinx::MPI::neighbors(comm)[1];
-
-  // Global-to-neigbourhood map for destination ranks
-  std::map<int, std::int32_t> dest_proc_to_neighbor;
-  for (std::size_t i = 0; i < dest_ranks.size(); ++i)
-    dest_proc_to_neighbor.insert({dest_ranks[i], i});
-
-  // Compute size of data to send to each process
-  std::vector<std::int32_t> counter(dest_ranks.size(), 0);
-  std::vector<int> ghost_to_neighbour_rank(num_ghost_entities, -1);
-  const std::vector<std::int64_t>& ghosts = map->ghosts();
-  std::vector<std::int64_t> ghost_data(num_ghost_entities);
-
-  for (std::int32_t i = 0; i < num_ghost_entities; ++i)
+  // -----------------------
+  // First communication step: [ghost->owner]
+  // Each process requests entity-cell connectivity to entity owner.
+  // Output: Adjacency list [neighbor - entities for wich connectivity
+  // information is required]
+  graph::AdjacencyList<std::int64_t> remote_entities(0);
   {
-    int entity = entities[num_owned + i];
-    ghost_data[i] = ghosts[entity];
-    const auto it = dest_proc_to_neighbor.find(ghost_owner_rank[entity]);
-    assert(it != dest_proc_to_neighbor.end());
-    ghost_to_neighbour_rank[i] = it->second;
-    counter[ghost_to_neighbour_rank[i]]++;
+    // Ghost to owner communicator
+    MPI_Comm comm = entity_map->comm(common::IndexMap::Direction::reverse);
+    const auto dest_ranks = dolfinx::MPI::neighbors(comm)[1];
+
+    // Global-to-neigbourhood map for destination ranks
+    std::unordered_map<int, std::int32_t> dest_proc_to_neighbor;
+    for (std::size_t i = 0; i < dest_ranks.size(); ++i)
+      dest_proc_to_neighbor.insert({dest_ranks[i], i});
+
+    // Compute size of data to send to each process
+    std::vector<std::int32_t> counter(dest_ranks.size(), 0);
+    std::vector<std::int64_t> send_data(num_ghost_entities);
+    const std::vector<std::int64_t>& ghosts = entity_map->ghosts();
+    std::vector<int> ghost_owner_rank = entity_map->ghost_owner_rank();
+    for (std::int32_t i = 0; i < num_ghost_entities; ++i)
+    {
+      // entity local index in ghost range
+      int entity = entities[num_owned_entities + i] - num_entities_dim;
+      // convert to global and add to send buffer
+      send_data[i] = ghosts[entity];
+      const auto it = dest_proc_to_neighbor.find(ghost_owner_rank[entity]);
+      assert(it != dest_proc_to_neighbor.end());
+      // count number of entities per owner
+      counter[it->second]++;
+    }
+
+    std::vector<int> send_disp(dest_ranks.size() + 1, 0);
+    std::partial_sum(counter.begin(), counter.end(),
+                     std::next(send_disp.begin(), 1));
+
+    // Send ghost entities to the owners and receive ghost entities which
+    // require cell connectivity information
+    const graph::AdjacencyList<std::int64_t> ghost_entities(
+        std::move(send_data), std::move(send_disp));
+    remote_entities = dolfinx::MPI::neighbor_all_to_all(comm, ghost_entities);
   }
 
-  std::vector<int> send_disp(dest_ranks.size() + 1, 0);
-  std::partial_sum(counter.begin(), counter.end(),
-                   std::next(send_disp.begin(), 1));
-
-  // Create and communicate adjacency list to neighborhood
-  const graph::AdjacencyList<std::int64_t> ghost_data_out(std::move(ghost_data),
-                                                          std::move(send_disp));
-  const graph::AdjacencyList<std::int64_t> ghost_data_in
-      = dolfinx::MPI::neighbor_all_to_all(comm, ghost_data_out);
-
-  // Get list of all onwed entities that need cell connectivity information
-  std::vector<std::int32_t> owned_entities;
+  //-------------------------
+  // Second communication step: [owner->ghost]
+  // Entity owner requests information of entity-cell connectivity to all
+  // processes that share a given entity marked as interface.
+  // Output: list of ghost entities (local entity number) which requires
+  // entity-cell connectivity data
+  std::vector<std::int32_t> ghost_entities;
   {
-    std::vector<std::int64_t> global_entities = ghost_data_in.array();
-    std::vector<std::int32_t> local_entities(global_entities.size());
-    map->global_to_local(global_entities, local_entities);
-    dolfinx::radix_sort<std::int32_t>(local_entities);
-    owned_entities.reserve(local_entities.size() + num_owned);
-    std::merge(local_entities.begin(), local_entities.end(), entities.begin(),
-               std::next(entities.begin(), num_owned),
-               std::back_inserter(owned_entities));
-    owned_entities.erase(
-        std::unique(owned_entities.begin(), owned_entities.end()),
-        owned_entities.end());
-  }
+    // Get list of all onwed entities that need cell connectivity information
+    // that includes received remote entities and local entities marked as
+    // interface
+    std::vector<std::int32_t> owned_entities;
+    {
+      std::vector<std::int64_t> global_entities = remote_entities.array();
+      std::vector<std::int32_t> local_entities(global_entities.size());
+      entity_map->global_to_local(global_entities, local_entities);
+      dolfinx::radix_sort<std::int32_t>(local_entities);
 
-  std::vector<short int> remote_entities_bool(ghosts.size());
-  std::vector<short int> entity_needs_info(local_size);
-  map->scatter_fwd<short int>(entity_needs_info, remote_entities, 1);
+      owned_entities.reserve(local_entities.size() + num_owned_entities);
+      std::merge(local_entities.begin(), local_entities.end(), entities.begin(),
+                 std::next(entities.begin(), num_owned_entities),
+                 std::back_inserter(owned_entities));
+      owned_entities.erase(
+          std::unique(owned_entities.begin(), owned_entities.end()),
+          owned_entities.end());
+    }
 
-  std::int32_t num_received_entities
-      = std::reduce(remote_entities_bool.begin(), remote_entities_bool.end(),
-                    std::int32_t(0), std::plus<std::int32_t>());
+    std::vector<std::int8_t> marked_entities(entity_map->num_ghosts());
+    std::vector<std::int8_t> entity_needs_info(entity_map->size_local(), 0);
 
-  std::vector<std::int32_t> remote_entities(num_received_entities);
-  {
-    std::int32_t pos = 0;
-    for (auto it = remote_entities_bool.begin();
-         it != remote_entities_bool.end(); it++)
+    // Mark entities that require cell connectivity info
+    for (const std::int32_t& e : owned_entities)
+      entity_needs_info[e] = 1;
+
+    // get remove markerd entities
+    entity_map->scatter_fwd<std::int8_t>(entity_needs_info, marked_entities, 1);
+
+    std::int32_t num_ghost_entities
+        = std::reduce(marked_entities.begin(), marked_entities.end(),
+                      std::int32_t(0), std::plus<std::int32_t>());
+    ghost_entities.reserve(num_ghost_entities);
+    for (auto it = marked_entities.begin(); it != marked_entities.end(); it++)
     {
       if (*it)
       {
-        std::ptrdiff_t entity = std::distance(remote_entities_bool.begin(), it);
-        remote_entities[pos++] = static_cast<std::int32_t>(entity);
+        std::ptrdiff_t facet = std::distance(marked_entities.begin(), it);
+        ghost_entities.push_back(static_cast<std::int32_t>(facet));
       }
     }
   }
 
-  // Get all cells incident to remote entities
-  std::shared_ptr<const dolfinx::graph::AdjacencyList<int32_t>> cell_entity
-      = topology.connectivity(dim, tdim);
+  //-------------------------
+  // Third communication step: [ghost->owner]
+  // Reply request with entity-cell connectivity data to entity owner
+  // [entity num_cells cell0 ...]
+  // Output: List of owned entities cell connectivity
+  {
+    // Get entity cell connectivity
+    std::shared_ptr<const dolfinx::graph::AdjacencyList<int32_t>> entity_cell
+        = topology.connectivity(dim, tdim);
+
+    // Ghost to owner communicator
+    MPI_Comm comm = entity_map->comm(common::IndexMap::Direction::reverse);
+    const auto dest_ranks = dolfinx::MPI::neighbors(comm)[1];
+
+    // Global-to-neigbourhood map for destination ranks
+    std::unordered_map<int, std::int32_t> dest_proc_to_neighbor;
+    for (std::size_t i = 0; i < dest_ranks.size(); ++i)
+      dest_proc_to_neighbor.insert({dest_ranks[i], i});
+
+    // Compute size of data to send to each process
+    std::vector<std::int32_t> counter(dest_ranks.size(), 0);
+    const std::vector<std::int64_t>& ghosts = entity_map->ghosts();
+    std::vector<int> ghost_owner_rank = entity_map->ghost_owner_rank();
+
+    for (std::size_t i = 0; i < ghost_entities.size(); ++i)
+    {
+      // entity local index
+      int entity = ghost_entities[i];
+      // entity local index in ghost range
+      int entity_pos = ghost_entities[i] - entity_map->size_local();
+
+      const auto it = dest_proc_to_neighbor.find(ghost_owner_rank[entity_pos]);
+      assert(it != dest_proc_to_neighbor.end());
+
+      auto cells = entity_cell->links(entity);
+      // count number of entities per owner
+      counter[it->second] += cells.size() + 2;
+    }
+  }
+
+  //-------------------------
+  // Fourth communication step: [owner->ghost]
+  // Entity owner send entity-cell connectivity data plus cell ownership to
+  // requesting process
+  // [entity num_cells owner_0 cell0 ...]
+
+  //-------------------------
+  // Fifth communication step: [ghost->owner]
+  // Compute new ghosts cells and inform owners
+
+  // // Ghost to owner communicator
+  // MPI_Comm comm = map->comm(common::IndexMap::Direction::reverse);
+  // const auto dest_ranks = dolfinx::MPI::neighbors(comm)[1];
+
+  // // Global-to-neigbourhood map for destination ranks
+  // std::map<int, std::int32_t> dest_proc_to_neighbor;
+  // for (std::size_t i = 0; i < dest_ranks.size(); ++i)
+  //   dest_proc_to_neighbor.insert({dest_ranks[i], i});
+
+  // // Get the owner of interface entities
+  // std::shared_ptr<const common::IndexMap> map = topology.index_map(dim);
+  // std::int32_t local_size = map->size_local();
+  // std::vector<int> ghost_owner_rank = map->ghost_owner_rank();
+
+  // // Get first ghost entity, ignore owned entities for now
+  // auto ghost_begin
+  //     = std::lower_bound(entities.begin(), entities.end(), local_size);
+  // std::int32_t num_owned = std::distance(entities.begin(), ghost_begin);
+  // std::int32_t num_ghost_entities = entities.size() - num_owned;
+
+  // // Ghost to owner communicator
+  // MPI_Comm comm = map->comm(common::IndexMap::Direction::reverse);
+  // const auto dest_ranks = dolfinx::MPI::neighbors(comm)[1];
+
+  // // Global-to-neigbourhood map for destination ranks
+  // std::map<int, std::int32_t> dest_proc_to_neighbor;
+  // for (std::size_t i = 0; i < dest_ranks.size(); ++i)
+  //   dest_proc_to_neighbor.insert({dest_ranks[i], i});
+
+  // // Compute size of data to send to each process
+  // std::vector<std::int32_t> counter(dest_ranks.size(), 0);
+  // std::vector<int> ghost_to_neighbour_rank(num_ghost_entities, -1);
+  // const std::vector<std::int64_t>& ghosts = map->ghosts();
+  // std::vector<std::int64_t> ghost_data(num_ghost_entities);
+
+  // for (std::int32_t i = 0; i < num_ghost_entities; ++i)
+  // {
+  //   int entity = entities[num_owned + i];
+  //   ghost_data[i] = ghosts[entity];
+  //   const auto it = dest_proc_to_neighbor.find(ghost_owner_rank[entity]);
+  //   assert(it != dest_proc_to_neighbor.end());
+  //   ghost_to_neighbour_rank[i] = it->second;
+  //   counter[ghost_to_neighbour_rank[i]]++;
+  // }
+
+  // std::vector<int> send_disp(dest_ranks.size() + 1, 0);
+  // std::partial_sum(counter.begin(), counter.end(),
+  //                  std::next(send_disp.begin(), 1));
+
+  // // Create and communicate adjacency list to neighborhood
+  // const graph::AdjacencyList<std::int64_t>
+  // ghost_data_out(std::move(ghost_data),
+  //                                                         std::move(send_disp));
+  // const graph::AdjacencyList<std::int64_t> ghost_data_in
+  //     = dolfinx::MPI::neighbor_all_to_all(comm, ghost_data_out);
+
+  // // Get list of all onwed entities that need cell connectivity information
+  // std::vector<std::int32_t> owned_entities;
+  // {
+  //   std::vector<std::int64_t> global_entities = ghost_data_in.array();
+  //   std::vector<std::int32_t> local_entities(global_entities.size());
+  //   map->global_to_local(global_entities, local_entities);
+  //   dolfinx::radix_sort<std::int32_t>(local_entities);
+  //   owned_entities.reserve(local_entities.size() + num_owned);
+  //   std::merge(local_entities.begin(), local_entities.end(),
+  //   entities.begin(),
+  //              std::next(entities.begin(), num_owned),
+  //              std::back_inserter(owned_entities));
+  //   owned_entities.erase(
+  //       std::unique(owned_entities.begin(), owned_entities.end()),
+  //       owned_entities.end());
+  // }
+
+  // std::vector<short int> remote_entities_bool(ghosts.size());
+  // std::vector<short int> entity_needs_info(local_size);
+  // map->scatter_fwd<short int>(entity_needs_info, remote_entities_bool, 1);
+
+  // std::int32_t num_received_entities
+  //     = std::reduce(remote_entities_bool.begin(), remote_entities_bool.end(),
+  //                   std::int32_t(0), std::plus<std::int32_t>());
+
+  // std::vector<std::int32_t> remote_entities(num_received_entities);
+  // {
+  //   std::int32_t pos = 0;
+  //   for (auto it = remote_entities_bool.begin();
+  //        it != remote_entities_bool.end(); it++)
+  //   {
+  //     if (*it)
+  //     {
+  //       std::ptrdiff_t entity = std::distance(remote_entities_bool.begin(),
+  //       it); remote_entities[pos++] = static_cast<std::int32_t>(entity);
+  //     }
+  //   }
+  // }
+
+  // // Get all cells incident to remote entities
+  // std::shared_ptr<const dolfinx::graph::AdjacencyList<int32_t>> entity_cell
+  //     = topology.connectivity(dim, tdim);
+
+  // std::vector<std::int32_t> num_incident_cells(remote_entities.size(), 0);
+  // for (std::size_t i = 0; i < remote_entities.size(); i++)
+  // {
+  //   auto&& cells = entity_cell->links(remote_entities[i]);
+  //   num_incident_cells[i] = cells.size();
+  // }
+
+  // std::vector<int> cells_offsets(remote_entities.size() + 1, 0);
+  // std::partial_sum(num_incident_cells.begin(), num_incident_cells.end(),
+  //                  std::next(cells_offsets.begin(), 1));
 
   return mesh;
 }
