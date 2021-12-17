@@ -479,17 +479,17 @@ std::vector<bool> mesh::compute_interface_facets(const Topology& topology)
   // Remove remote exterior domain facets from candidates
   // Note: std::vector<bool> cannot be converted to span<bool>, using short int
   // instead
-  std::vector<short int> remote_boundary_facets(facets->num_ghosts(), 0);
-  std::vector<short int> _boundary_facet(boundary_facet.size());
+  std::vector<std::int8_t> remote_boundary_facets(facets->num_ghosts(), 0);
+  std::vector<std::int8_t> _boundary_facet(boundary_facet.size());
   // Copy over as an
   std::copy(boundary_facet.begin(), boundary_facet.end(),
             _boundary_facet.begin());
-  facets->scatter_fwd<short int>(tcb::make_span(_boundary_facet),
-                                 tcb::make_span(remote_boundary_facets), 1);
+  facets->scatter_fwd<std::int8_t>(tcb::make_span(_boundary_facet),
+                                   tcb::make_span(remote_boundary_facets), 1);
   std::transform(remote_boundary_facets.begin(), remote_boundary_facets.end(),
                  _interface_facets.begin() + facets->size_local(),
                  _interface_facets.begin() + facets->size_local(),
-                 [](const short int& f0, const bool& f1)
+                 [](const std::int8_t& f0, const bool& f1)
                  { return f0 ? false : f1; });
 
   return _interface_facets;
