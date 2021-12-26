@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 
 import ufl
-from dolfinx.fem import (Constant, DirichletBC, Function, FunctionSpace,
+from dolfinx.fem import (Constant, DirichletBC, Form, Function, FunctionSpace,
                          apply_lifting, assemble_matrix, assemble_scalar,
                          assemble_vector, set_bc)
 from dolfinx.mesh import (GhostMode, MeshTags, create_unit_square,
@@ -53,7 +53,7 @@ def test_assembly_dx_domains(mode):
 
     # Assemble matrix
     a = w * ufl.inner(u, v) * (dx(1) + dx(2) + dx(3))
-    A = assemble_matrix(a)
+    A = assemble_matrix(Form(a))
     A.assemble()
     a2 = w * ufl.inner(u, v) * dx
     A2 = assemble_matrix(a2)
@@ -64,7 +64,7 @@ def test_assembly_dx_domains(mode):
 
     # Assemble vector
     L = ufl.inner(w, v) * (dx(1) + dx(2) + dx(3))
-    b = assemble_vector(L)
+    b = assemble_vector(Form(L))
 
     apply_lifting(b, [a], [[bc]])
     b.ghostUpdate(addv=PETSc.InsertMode.ADD_VALUES,
@@ -72,7 +72,7 @@ def test_assembly_dx_domains(mode):
     set_bc(b, [bc])
 
     L2 = ufl.inner(w, v) * dx
-    b2 = assemble_vector(L2)
+    b2 = assemble_vector(Form(L2))
     apply_lifting(b2, [a], [[bc]])
     b2.ghostUpdate(addv=PETSc.InsertMode.ADD_VALUES,
                    mode=PETSc.ScatterMode.REVERSE)
@@ -146,14 +146,14 @@ def test_assembly_ds_domains(mode):
 
     # Assemble vector
     L = ufl.inner(w, v) * (ds(1) + ds(2) + ds(3) + ds(6))
-    b = assemble_vector(L)
+    b = assemble_vector(Form(L))
 
     apply_lifting(b, [a], [[bc]])
     b.ghostUpdate(addv=PETSc.InsertMode.ADD_VALUES, mode=PETSc.ScatterMode.REVERSE)
     set_bc(b, [bc])
 
     L2 = ufl.inner(w, v) * ds
-    b2 = assemble_vector(L2)
+    b2 = assemble_vector(Form(L2))
     apply_lifting(b2, [a2], [[bc]])
     b2.ghostUpdate(addv=PETSc.InsertMode.ADD_VALUES, mode=PETSc.ScatterMode.REVERSE)
     set_bc(b2, [bc])

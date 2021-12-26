@@ -13,7 +13,7 @@ from contextlib import ExitStack
 import numpy as np
 
 from dolfinx import la
-from dolfinx.fem import (DirichletBC, Function, VectorFunctionSpace,
+from dolfinx.fem import (DirichletBC, Form, Function, VectorFunctionSpace,
                          apply_lifting, assemble_matrix, assemble_vector,
                          locate_dofs_geometrical, set_bc)
 from dolfinx.io import XDMFFile
@@ -112,6 +112,9 @@ bc = DirichletBC(np.array([0, 0, 0], dtype=PETSc.ScalarType),
 # Assembly and solve
 # ------------------
 # ::
+
+a, L = Form(a), Form(L)
+
 
 # Assemble system, applying boundary conditions
 A = assemble_matrix(a, bcs=[bc])

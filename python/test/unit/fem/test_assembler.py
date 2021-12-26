@@ -108,6 +108,8 @@ def test_basic_assembly(mode):
     a = inner(f * u, v) * dx + inner(u, v) * ds
     L = inner(f, v) * dx + inner(2.0, v) * ds
 
+    L = Form(L)
+
     # Initial assembly
     A = assemble_matrix(a)
     A.assemble()
@@ -152,6 +154,8 @@ def test_assembly_bcs(mode):
     a = inner(u, v) * dx + inner(u, v) * ds
     L = inner(1.0, v) * dx
 
+    L = Form(L)
+
     bdofsV = locate_dofs_geometrical(V, lambda x: np.logical_or(np.isclose(x[0], 0.0), np.isclose(x[0], 1.0)))
     bc = DirichletBC(PETSc.ScalarType(1), bdofsV, V)
 
@@ -193,6 +197,8 @@ def test_assemble_manifold():
     u, v = ufl.TrialFunction(U), ufl.TestFunction(U)
     a = ufl.inner(ufl.grad(u), ufl.grad(v)) * ufl.dx(mesh)
     L = ufl.inner(1.0, v) * ufl.dx(mesh)
+
+    L = Form(L)
 
     bcdofs = locate_dofs_geometrical(U, lambda x: np.isclose(x[0], 0.0))
     bcs = [DirichletBC(PETSc.ScalarType(0), bcdofs, U)]
@@ -278,6 +284,8 @@ def test_matrix_assembly_block(mode):
     a = inner(u0, v0) * dx + inner(u1, v1) * dx + inner(u0, v1) * dx + inner(
         u1, v0) * dx
     L = zero * inner(f, v0) * ufl.dx + inner(g, v1) * dx
+    L = Form(L)
+
 
     bdofsW_V1 = locate_dofs_topological(W.sub(1), mesh.topology.dim - 1, bndry_facets)
     bc = DirichletBC(u_bc, bdofsW_V1, W.sub(1))
@@ -382,6 +390,8 @@ def test_assembly_solve_block(mode):
     v0, v1 = ufl.TestFunctions(W)
     a = inner(u0, v0) * dx + inner(u1, v1) * dx
     L = inner(f, v0) * ufl.dx + inner(g, v1) * dx
+
+    L = Form(L)
 
     bdofsW0_V0 = locate_dofs_topological(W.sub(0), facetdim, bndry_facets)
     bdofsW1_V1 = locate_dofs_topological(W.sub(1), facetdim, bndry_facets)
@@ -547,6 +557,8 @@ def test_assembly_solve_taylor_hood(mesh):
         L1 = inner(p_zero, q) * dx
         L = L0 + L1
 
+        L = Form(L)
+
         bdofsW0_P2_0 = locate_dofs_topological(W.sub(0), facetdim, bndry_facets0)
         bdofsW0_P2_1 = locate_dofs_topological(W.sub(0), facetdim, bndry_facets1)
 
@@ -610,6 +622,8 @@ def test_basic_interior_facet_assembly():
     assert isinstance(A, PETSc.Mat)
 
     L = ufl.conj(ufl.avg(v)) * ufl.dS
+    L = Form(L)
+
     b = assemble_vector(L)
     b.assemble()
     assert isinstance(b, PETSc.Vec)
@@ -631,6 +645,7 @@ def test_basic_assembly_constant(mode):
 
     a = inner(c[1, 0] * u, v) * dx + inner(c[1, 0] * u, v) * ds
     L = inner(c[1, 0], v) * dx + inner(c[1, 0], v) * ds
+    L = Form(L)
 
     # Initial assembly
     A1 = assemble_matrix(a)
@@ -694,14 +709,16 @@ def test_pack_coefficients():
     F = ufl.inner(c, v) * dx - c * ufl.sqrt(u * u) * ufl.inner(u, v) * dx
     u.x.array[:] = 10.0
 
+
     # -- Test vector
-    b0 = assemble_vector(F)
+    L = Form(F)
+    b0 = assemble_vector(L)
     b0.assemble()
-    constants = pack_constants(F)
-    coeffs = pack_coefficients(F)
+    constants = pack_constants(L)
+    coeffs = pack_coefficients(L)
     with b0.localForm() as _b0:
         for c in [(None, None), (None, coeffs), (constants, None), (constants, coeffs)]:
-            b = assemble_vector(F, coeffs=c)
+            b = assemble_vector(L, coeffs=c)
             b.assemble()
             with b.localForm() as _b:
                 assert (_b0.array_r == _b.array_r).all()
@@ -712,7 +729,7 @@ def test_pack_coefficients():
         coeff *= 5.0
     with b0.localForm() as _b0:
         for c in [(None, coeffs), (constants, None), (constants, coeffs)]:
-            b = assemble_vector(F, coeffs=c)
+            b = assemble_vector(L, coeffs=c)
             b.assemble()
             with b.localForm() as _b:
                 assert (_b0 - _b).norm() > 1.0e-5
@@ -720,6 +737,7 @@ def test_pack_coefficients():
     # -- Test matrix
     du = ufl.TrialFunction(V)
     J = ufl.derivative(F, u, du)
+    J = Form(J)
 
     A0 = assemble_matrix(J)
     A0.assemble()
@@ -754,13 +772,13 @@ def test_coefficents_non_constant():
 
     # -- Volume integral vector
     F = (ufl.inner(u, v) - ufl.inner(x[0] * x[1]**2, v)) * dx
-    b0 = assemble_vector(F)
+    b0 = assemble_vector(Form(F))
     b0.assemble()
     assert(np.linalg.norm(b0.array) == pytest.approx(0.0))
 
     # -- Exterior facet integral vector
     F = (ufl.inner(u, v) - ufl.inner(x[0] * x[1]**2, v)) * ds
-    b0 = assemble_vector(F)
+    b0 = assemble_vector(Form(F))
     b0.assemble()
     assert(np.linalg.norm(b0.array) == pytest.approx(0.0))
 
@@ -776,7 +794,7 @@ def test_coefficents_non_constant():
     v = ufl.TestFunction(V)
 
     F = (ufl.inner(u1('+') * u0('-'), ufl.avg(v)) - ufl.inner(x[0] * x[1]**2, ufl.avg(v))) * ufl.dS
-    b0 = assemble_vector(F)
+    b0 = assemble_vector(Form(F))
     b0.assemble()
     assert(np.linalg.norm(b0.array) == pytest.approx(0.0))
 

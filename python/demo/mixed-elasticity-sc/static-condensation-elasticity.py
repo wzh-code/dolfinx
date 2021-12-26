@@ -20,9 +20,9 @@ import numpy as np
 import ufl
 from dolfinx import geometry
 from dolfinx.cpp.fem import Form_complex128, Form_float64
-from dolfinx.fem import (DirichletBC, Function, FunctionSpace, IntegralType,
-                         apply_lifting, assemble_matrix, assemble_vector,
-                         locate_dofs_topological, set_bc)
+from dolfinx.fem import (DirichletBC, Form, Function, FunctionSpace,
+                         IntegralType, apply_lifting, assemble_matrix,
+                         assemble_vector, locate_dofs_topological, set_bc)
 from dolfinx.io import XDMFFile
 from dolfinx.jit import ffcx_jit
 from dolfinx.mesh import MeshTags, locate_entities_boundary
@@ -93,6 +93,8 @@ a01 = - ufl.inner(sigma_u(u), tau) * ufl.dx
 
 f = ufl.as_vector([0.0, 1.0 / 16])
 b1 = - ufl.inner(f, v) * ds(1)
+
+b1 = Form(b1)
 
 # JIT compile individual blocks tabulation kernels
 nptype = "complex128" if np.issubdtype(PETSc.ScalarType, np.complexfloating) else "float64"

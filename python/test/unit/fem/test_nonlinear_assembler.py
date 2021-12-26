@@ -145,6 +145,8 @@ def test_matrix_assembly_block_nl():
         - inner(f, v0) * ufl.dx - inner(g, v1) * dx
     J = derivative(F, U, dU)
 
+    F = Form(F)
+
     bdofsW_V1 = locate_dofs_topological((W.sub(1), V1), facetdim, bndry_facets)
 
     bc = DirichletBC(u_bc, bdofsW_V1, W.sub(1))

@@ -110,12 +110,12 @@ def create_matrix(a: Form, mat_type=None) -> PETSc.Mat:
 
 
 def create_matrix_block(a: typing.List[typing.List[Form]]) -> PETSc.Mat:
-    _a =  [[a._cpp_object if a is not None else None for a in a_row] for a_row in a]
+    _a = [[a._cpp_object if a is not None else None for a in a_row] for a_row in a]
     return _cpp.fem.petsc.create_matrix_block(_a)
 
 
 def create_matrix_nest(a: typing.List[typing.List[Form]]) -> PETSc.Mat:
-    _a =  [[a._cpp_object if a is not None else None for a in a_row] for a_row in a]
+    _a = [[a._cpp_object if a is not None else None for a in a_row] for a_row in a]
     return _cpp.fem.petsc.create_matrix_nest(_a)
 
 
@@ -144,14 +144,13 @@ def assemble_vector(L: Form, coeffs=Coefficients(None, None)) -> PETSc.Vec:
     owning processes.
 
     """
-    _L = _create_cpp_form(L)
-    b = la.create_petsc_vector(_L.function_spaces[0].dofmap.index_map,
-                               _L.function_spaces[0].dofmap.index_map_bs)
-    c = (coeffs[0] if coeffs[0] is not None else pack_constants(_L),
-         coeffs[1] if coeffs[1] is not None else pack_coefficients(_L))
+    b = la.create_petsc_vector(L.function_spaces[0].dofmap.index_map,
+                               L.function_spaces[0].dofmap.index_map_bs)
+    c = (coeffs[0] if coeffs[0] is not None else pack_constants(L),
+         coeffs[1] if coeffs[1] is not None else pack_coefficients(L))
     with b.localForm() as b_local:
         b_local.set(0.0)
-        _cpp.fem.assemble_vector(b_local.array_w, _L, c[0], c[1])
+        _cpp.fem.assemble_vector(b_local.array_w, L._cpp_object, c[0], c[1])
     return b
 
 
