@@ -82,37 +82,41 @@ def pack_coefficients(form: form_type):
 # -- Vector instantiation ----------------------------------------------------
 
 def create_vector(L: Form) -> PETSc.Vec:
-    dofmap = _create_cpp_form(L).function_spaces[0].dofmap
+    """Create a PETSc vector with a parallel layout that is compatible
+    with a linear Form"""
+    dofmap = L.function_spaces[0].dofmap
     return la.create_petsc_vector(dofmap.index_map, dofmap.index_map_bs)
 
 
 def create_vector_block(L: typing.List[Form]) -> PETSc.Vec:
     maps = [(form.function_spaces[0].dofmap.index_map, form.function_spaces[0].dofmap.index_map_bs)
-            for form in _create_cpp_form(L)]
+            for form in L]
     return _cpp.fem.petsc.create_vector_block(maps)
 
 
 def create_vector_nest(L: typing.List[Form]) -> PETSc.Vec:
     maps = [(form.function_spaces[0].dofmap.index_map, form.function_spaces[0].dofmap.index_map_bs)
-            for form in _create_cpp_form(L)]
+            for form in L]
     return _cpp.fem.petsc.create_vector_nest(maps)
 
 
 # -- Matrix instantiation ----------------------------------------------------
 
 def create_matrix(a: Form, mat_type=None) -> PETSc.Mat:
-    if mat_type is not None:
-        return _cpp.fem.petsc.create_matrix(_create_cpp_form(a), mat_type)
+    if mat_type is None:
+        return _cpp.fem.petsc.create_matrix(a._cpp_object)
     else:
-        return _cpp.fem.petsc.create_matrix(_create_cpp_form(a))
+        return _cpp.fem.petsc.create_matrix(a._cpp_object, mat_type)
 
 
 def create_matrix_block(a: typing.List[typing.List[Form]]) -> PETSc.Mat:
-    return _cpp.fem.petsc.create_matrix_block(_create_cpp_form(a))
+    _a =  [[a._cpp_object if a is not None else None for a in a_row] for a_row in a]
+    return _cpp.fem.petsc.create_matrix_block(_a)
 
 
 def create_matrix_nest(a: typing.List[typing.List[Form]]) -> PETSc.Mat:
-    return _cpp.fem.petsc.create_matrix_nest(_create_cpp_form(a))
+    _a =  [[a._cpp_object if a is not None else None for a in a_row] for a_row in a]
+    return _cpp.fem.petsc.create_matrix_nest(_a)
 
 
 Coefficients = collections.namedtuple('Coefficients', ['constants', 'coeffs'])

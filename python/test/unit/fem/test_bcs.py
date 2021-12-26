@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 
 import ufl
-from dolfinx.fem import (Constant, DirichletBC, Function, FunctionSpace,
+from dolfinx.fem import (Constant, DirichletBC, Form, Function, FunctionSpace,
                          VectorFunctionSpace, apply_lifting, assemble_matrix,
                          assemble_vector, create_matrix, create_vector,
                          locate_dofs_geometrical, locate_dofs_topological,
@@ -77,7 +77,7 @@ def test_overlapping_bcs():
     bcs = [DirichletBC(PETSc.ScalarType(0), dofs_left, V),
            DirichletBC(PETSc.ScalarType(123.456), dofs_top, V)]
 
-    A, b = create_matrix(a), create_vector(L)
+    A, b = create_matrix(Form(a)), create_vector(Form(L))
     assemble_matrix(A, a, bcs=bcs)
     A.assemble()
 

@@ -162,13 +162,13 @@ def test_matrix_assembly_block_nl():
 class NonlinearPDE_SNESProblem():
     def __init__(self, F, J, soln_vars, bcs, P=None):
         try:
-            self.L = [Form(_F) for _F in F]
+            self.L = [_F for _F in F]
         except TypeError:
-            self.L = Form(F)
+            self.L = F
         try:
-            self.a = [[Form(_J) for _J in Jrow] for Jrow in J]
+            self.a = [[_J for _J in Jrow] for Jrow in J]
         except TypeError:
-            self.a = Form(J)
+            self.a = J
         self.a_precon = P
         self.bcs = bcs
         self.soln_vars = soln_vars
@@ -301,9 +301,11 @@ def test_assembly_solve_block_nl():
 
     F = [inner((u**2 + 1) * ufl.grad(u), ufl.grad(v)) * dx - inner(f, v) * dx,
          inner((p**2 + 1) * ufl.grad(p), ufl.grad(q)) * dx - inner(g, q) * dx]
-
     J = [[derivative(F[0], u, du), derivative(F[0], p, dp)],
          [derivative(F[1], u, du), derivative(F[1], p, dp)]]
+
+    F = [Form(_F) for _F in F]
+    J = [[Form(J) for J in Jrow] for Jrow in J]
 
     def blocked_solve():
         """Blocked version"""
@@ -389,6 +391,9 @@ def test_assembly_solve_block_nl():
             + inner((u1**2 + 1) * ufl.grad(u1), ufl.grad(v1)) * dx \
             - inner(f, v0) * ufl.dx - inner(g, v1) * dx
         J = derivative(F, U, dU)
+
+        F = Form(F)
+        J = Form(J)
 
         u0_bc = Function(V0)
         u0_bc.interpolate(bc_val_0)
@@ -485,11 +490,15 @@ def test_assembly_solve_taylor_hood_nl(mesh):
     P = [[J[0][0], None],
          [None, inner(dp, q) * dx]]
 
+    F = [Form(_F) for _F in F]
+    J = [list(map(lambda x: Form(x), _J)) for _J in J]
+    P = [[Form(P) if P is not None else None for P in Prow] for Prow in P]
+
     # -- Blocked and monolithic
 
+    Fvec0 = create_vector_block(F)
     Jmat0 = create_matrix_block(J)
     Pmat0 = create_matrix_block(P)
-    Fvec0 = create_vector_block(F)
 
     snes = PETSc.SNES().create(MPI.COMM_WORLD)
     snes.setTolerances(rtol=1.0e-15, max_it=10)
@@ -574,6 +583,8 @@ def test_assembly_solve_taylor_hood_nl(mesh):
         + inner(ufl.div(u), q) * dx
     J = derivative(F, U, dU)
     P = inner(ufl.grad(du), ufl.grad(v)) * dx + inner(dp, q) * dx
+
+    F, J, P = Form(F), Form(J), Form(P)
 
     bdofsW0_P2_0 = locate_dofs_topological((W.sub(0), P2), facetdim, bndry_facets0)
     bdofsW0_P2_1 = locate_dofs_topological((W.sub(0), P2), facetdim, bndry_facets1)
